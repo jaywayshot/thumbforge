@@ -32,5 +32,8 @@ python-dotenv==1.2.2
 httpx==0.28.1
 aiofiles==25.1.0
 
+# ===== 경쟁사 분석 (정적 HTML 파싱) =====
+beautifulsoup4==4.12.3
+
 # ===== Dev =====
 pytest==9.0.3

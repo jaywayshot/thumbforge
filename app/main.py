@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.routes_analyze import router as analyze_router
 from app.api.routes_brand import router as brand_router
 from app.api.routes_bulk import router as bulk_router
 from app.api.routes_download import router as download_router
@@ -85,6 +86,7 @@ app.include_router(upload_router)
 app.include_router(generate_router)
 app.include_router(bulk_router)
 app.include_router(brand_router)
+app.include_router(analyze_router)
 app.include_router(download_router)
 
 # 정적 페이지 (간단한 데모 UI)

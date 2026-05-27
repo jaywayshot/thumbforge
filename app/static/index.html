@@ -124,6 +124,25 @@
                         margin-right: 4px; vertical-align: middle; border: 1px solid var(--border); }
   .brand-card-actions { display: flex; gap: 6px; margin-top: 10px; }
   .brand-card-actions button { padding: 6px 10px; font-size: 12px; margin: 0; flex: 1; }
+  /* 경쟁사 분석 */
+  .analyze-grid { display: grid; grid-template-columns: 360px 1fr; gap: 24px; }
+  @media (max-width: 900px) { .analyze-grid { grid-template-columns: 1fr; } }
+  .palette { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .palette .chip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .palette .chip .box { width: 48px; height: 48px; border-radius: 8px; border: 1px solid var(--border); }
+  .palette .chip .lbl { font-size: 10px; color: var(--muted); }
+  .stat-bar { margin: 8px 0; }
+  .stat-bar .bl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat-bar .track { height: 10px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+  .stat-bar .track > div { height: 100%; background: var(--accent); }
+  .analyze-section { margin-bottom: 20px; }
+  .analyze-section h3 { font-size: 13px; color: var(--muted); margin: 0 0 8px;
+                        text-transform: uppercase; letter-spacing: 1px; }
+  .concept-recos { display: flex; flex-wrap: wrap; gap: 6px; }
+  .concept-recos .reco { padding: 6px 12px; border-radius: 99px; background: var(--panel-2);
+                         border: 1px solid var(--accent); color: var(--text); font-size: 13px; }
+  .warn-box { color: var(--warning); padding: 12px; background: rgba(245,158,11,0.1);
+              border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
 </style>
 </head>
 <body>
@@ -137,6 +156,7 @@
     <div class="tab active" data-view="single">단일 생성</div>
     <div class="tab" data-view="bulk">대량 처리</div>
     <div class="tab" data-view="brand">브랜드 관리</div>
+    <div class="tab" data-view="analyze">경쟁사 분석</div>
   </div>
 </header>
 
@@ -272,6 +292,36 @@
         <button id="deleteBrand" class="secondary" style="background:rgba(239,68,68,0.1); color:var(--danger); border-color:var(--danger);">삭제</button>
       </div>
       <div id="brandMsg" style="margin-top:8px; font-size: 13px;"></div>
+    </div>
+  </div>
+
+  <!-- 경쟁사 분석 -->
+  <div id="view-analyze" class="view">
+    <div class="analyze-grid">
+      <div class="panel">
+        <h2>쿠팡 검색결과 분석</h2>
+        <p style="color:var(--muted); font-size: 13px; margin: 0 0 16px;">
+          쿠팡 검색결과 URL을 넣으면 상위 상품 썸네일의 색감·배경 톤·할인 뱃지 패턴을 분석해
+          적합한 컨셉을 추천합니다. <strong>robots.txt를 존중</strong>하며 정적 HTML만 분석합니다.
+        </p>
+        <label>쿠팡 검색결과 URL</label>
+        <input id="compUrl" type="text" placeholder="https://www.coupang.com/np/search?q=..." />
+        <label>분석 개수 (최대 20)</label>
+        <input id="compMax" type="number" min="1" max="20" value="20" />
+        <button id="compBtn" class="primary">분석하기</button>
+        <p style="color:var(--muted); font-size: 11px; margin-top: 10px;">
+          ※ 같은 URL은 24시간 동안 캐시되어 재요청 시 네트워크를 다시 타지 않습니다.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>분석 결과</h2>
+        <div id="compResults">
+          <div class="results-empty">
+            좌측에 쿠팡 검색결과 URL을 입력하고 <strong>분석하기</strong>를 눌러주세요.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -588,6 +638,113 @@ $("#deleteBrand").addEventListener("click", async () => {
   loadBrandList();
   loadOptions();
 });
+
+/* 경쟁사 분석 */
+const compBtn = $("#compBtn"), compResults = $("#compResults");
+let lastAnalysis = null;
+
+compBtn.addEventListener("click", async () => {
+  const url = $("#compUrl").value.trim();
+  if (!url) { compResults.innerHTML = `<div class="err">URL을 입력하세요.</div>`; return; }
+  compBtn.disabled = true;
+  compResults.innerHTML = `<div class="loader"></div><div class="progress">분석 중... (썸네일 다운로드 + 색상 분석)</div>`;
+  try {
+    const res = await fetch(API + "/api/analyze/competitor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, max_items: parseInt($("#compMax").value) || 20 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    lastAnalysis = data;
+    renderAnalysis(data);
+  } catch (e) {
+    compResults.innerHTML = `<div class="err">분석 실패: ${e.message}</div>`;
+  } finally { compBtn.disabled = false; }
+});
+
+function bar(label, value, pct) {
+  return `<div class="stat-bar"><div class="bl"><span>${label}</span><span>${value}</span></div>
+    <div class="track"><div style="width:${Math.min(100, pct)}%"></div></div></div>`;
+}
+
+function renderAnalysis(d) {
+  if (d.analyzed_count === 0) {
+    compResults.innerHTML = `
+      <div class="warn-box">${d.warning || '분석할 썸네일을 찾지 못했습니다.'}</div>
+      <div style="font-size:12px; color:var(--muted);">
+        발견된 썸네일: ${d.thumbnails_found || 0} · 다운로드 실패: ${d.fetch_failed || 0}
+      </div>`;
+    return;
+  }
+  const cached = d.cached ? `<span class="tag">캐시됨</span>` : "";
+  const palette = (d.dominant_colors || []).map(c =>
+    `<div class="chip"><div class="box" style="background:${c.hex}"></div>
+       <div class="lbl">${c.hex}</div><div class="lbl">${Math.round(c.weight*100)}%</div></div>`
+  ).join("");
+
+  const toneTotal = Object.values(d.bg_tone_distribution || {}).reduce((a,b)=>a+b,0) || 1;
+  const tones = Object.entries(d.bg_tone_distribution || {})
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => bar(k, `${v}개`, v/toneTotal*100)).join("");
+
+  const recos = (d.suggested_concepts || []).map(cid => {
+    const label = (CONCEPTS[cid] && CONCEPTS[cid].label) || cid;
+    return `<span class="reco">${label}</span>`;
+  }).join("");
+
+  const warn = d.warning ? `<div class="warn-box">${d.warning}</div>` : "";
+
+  compResults.innerHTML = `
+    ${warn}
+    <div style="font-size:12px; color:var(--muted); margin-bottom:16px;">
+      분석 ${d.analyzed_count}개 · 발견 ${d.thumbnails_found} · 실패 ${d.fetch_failed} ${cached}
+    </div>
+
+    <div class="analyze-section">
+      <h3>Dominant 컬러</h3>
+      <div class="palette">${palette}</div>
+    </div>
+
+    <div class="analyze-section">
+      <h3>배경 톤 분포</h3>
+      ${tones}
+    </div>
+
+    <div class="analyze-section">
+      <h3>지표</h3>
+      ${bar("할인 뱃지 비율", `${Math.round(d.badge_ratio*100)}%`, d.badge_ratio*100)}
+      ${bar("평균 텍스트 영역", `${Math.round(d.avg_text_area_ratio*100)}%`, d.avg_text_area_ratio*100)}
+    </div>
+
+    <div class="analyze-section">
+      <h3>추천 컨셉</h3>
+      <div class="concept-recos">${recos || '<span class="lbl">추천 없음</span>'}</div>
+    </div>
+
+    <div class="analyze-section" style="font-size:11px; color:var(--muted);">
+      ※ ${d.korean_words_note || ''}
+    </div>
+
+    <button id="applyAnalysis" class="secondary">이 결과로 단일 생성 옵션 채우기 →</button>
+  `;
+
+  const applyBtn = $("#applyAnalysis");
+  if (applyBtn) applyBtn.addEventListener("click", applyAnalysisToSingle);
+}
+
+function applyAnalysisToSingle() {
+  if (!lastAnalysis) return;
+  const recos = (lastAnalysis.suggested_concepts || []).filter(c => CONCEPTS[c]);
+  if (recos.length) $("#concept").value = recos[0];
+  // 할인 뱃지가 흔하면 할인% 칸에 기본값 제안
+  if (lastAnalysis.badge_ratio >= 0.4 && !$("#discount").value) $("#discount").value = 30;
+  // 단일 생성 탭으로 전환
+  $$(".tab").forEach(x => x.classList.remove("active"));
+  $$(".view").forEach(x => x.classList.remove("active"));
+  document.querySelector('.tab[data-view="single"]').classList.add("active");
+  $("#view-single").classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 </script>
 </body>
 </html>

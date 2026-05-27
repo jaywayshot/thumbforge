@@ -355,7 +355,7 @@ sudo apt install fonts-nanum
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
 | 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | ✅ (TEXT_PROVIDER=openai/anthropic, 키 없으면 mock 폴백) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
-| 다음 | 경쟁사 URL 분석 (쿠팡 상위 썸네일 색감/문구 패턴) | 🔜 |
+| 다음 | 경쟁사 URL 분석 (쿠팡 상위 썸네일 색감/문구 패턴) | ✅ (정적 HTML 분석, robots.txt 존중, 24h 캐시. 한글 단어 빈도는 OCR 추후) |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
 | 확장 | 유튜브 썸네일 / 쇼츠·릴스 / 광고 소재 / 상세페이지 자동 생성 | 🔜 |
 
