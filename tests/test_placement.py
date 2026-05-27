@@ -70,6 +70,7 @@ def _patched_scene_provider():
     def fake(self, width, height, concept, seed=0, prompt=None):
         # 대비/색 다양성이 충분한 가짜 배경(QC 통과용)
         import numpy as np
+        self.last_provider = "stability"  # 실제 생성으로 간주
         arr = np.zeros((height, width, 3), dtype=np.uint8)
         arr[..., 0] = np.linspace(180, 240, width)[None, :]
         arr[..., 1] = np.linspace(160, 220, height)[:, None]

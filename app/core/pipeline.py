@@ -121,6 +121,7 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
     out_dir = job_output_dir(job_id)
     variants: list[Variant] = []
     variant_meta: dict[str, dict] = {}  # 피드백 복원용 (variant_id → 메타)
+    scene_used = {"provider": None, "cache_hit": False}  # 실제 사용 provider 추적(정직 보고)
 
     for i in range(max(1, req.variants)):
         layout_name = layout_pool[i % len(layout_pool)]
@@ -140,10 +141,15 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
                 bgimg = None
                 if use_cache and not req.fresh:
                     bgimg = scene_cache.get(scene_key)
+                    if bgimg is not None:
+                        scene_used["cache_hit"] = True
                 if bgimg is None:
                     bgimg = scene_provider.generate(width, height, concept, seed=seed,
                                                      prompt=(scene_pos, scene_neg))
-                    scene_cache.set(scene_key, bgimg)
+                    scene_used["provider"] = scene_provider.last_provider
+                    # 실제 AI 생성 성공분만 캐시(mock 폴백은 캐시 안 함)
+                    if scene_provider.last_provider in ("stability", "dalle"):
+                        scene_cache.set(scene_key, bgimg)
                 bgimg = bgimg.resize((width, height), Image.LANCZOS)
             else:
                 bgimg = bg_provider.generate(width, height, concept, seed=seed)
@@ -233,6 +239,17 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
     except Exception:
         pass  # 메타 저장 실패가 생성 자체를 막지 않도록
 
+    # 실제로 어떤 배경이 쓰였는지 정직하게 판정
+    if not scene_mode:
+        actual = "mock"
+    elif scene_used["provider"] in ("stability", "dalle"):
+        actual = scene_used["provider"]
+    elif scene_used["cache_hit"]:
+        actual = "cached"
+    else:
+        actual = "mock"  # scene 모드였지만 API 실패로 mock 폴백
+    real_scene = actual in ("stability", "dalle", "cached")
+
     elapsed = int((time.time() - t0) * 1000)
     return GenerateResponse(
         job_id=job_id,
@@ -240,7 +257,8 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
         platform=req.platform,
         variants=variants,
         elapsed_ms=elapsed,
-        bg_mode="scene" if scene_mode else "mock",
+        bg_mode="scene" if real_scene else "mock",
+        bg_provider_used=actual,
         scene_positive=scene_pos if scene_mode else None,
         scene_negative=scene_neg if scene_mode else None,
     )

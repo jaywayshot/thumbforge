@@ -603,6 +603,15 @@ async function handleFile(file) {
     const data = await res.json();
     currentUpload = data.upload_id;
     currentCategory = data.detected_category || "general";
+    // 감지 카테고리 → v2 카테고리 자동 선택 (AI 배경이 기본으로 켜지도록)
+    const DET2V2 = { electronics:"전자제품", fashion:"의류", health_food:"식품",
+                     beauty:"뷰티", kitchen:"생활용품", car:"기타", pet:"기타",
+                     camping:"기타", general:"기타" };
+    const v2cat = DET2V2[currentCategory] || "기타";
+    if ($("#pi_category").querySelector(`option[value="${v2cat}"]`)) {
+      $("#pi_category").value = v2cat;
+      onCategoryChange();
+    }
     uploadMeta.innerHTML = `
       <span class="tag">${data.width}×${data.height}</span>
       <span class="tag">${data.has_alpha ? "투명 PNG" : "JPG/배경 있음"}</span>
@@ -690,8 +699,13 @@ function renderResults(data, append = false) {
     const g = results.querySelector(".results-grid");
     if (g) { g.insertAdjacentHTML("beforeend", cards); return; }
   }
-  const sceneTag = data.bg_mode === "scene"
-    ? `<span class="tag" style="border-color:var(--success); color:var(--success);">AI 라이프스타일 배경</span>` : "";
+  const provLabel = { stability: "AI 배경 · Stability", dalle: "AI 배경 · DALL-E", cached: "AI 배경 · 캐시" };
+  let sceneTag = "";
+  if (data.bg_provider_used && provLabel[data.bg_provider_used]) {
+    sceneTag = `<span class="tag" style="border-color:var(--success); color:var(--success);">${provLabel[data.bg_provider_used]}</span>`;
+  } else if (data.bg_provider_used === "mock") {
+    sceneTag = `<span class="tag warn">mock 배경 (AI 미사용)</span>`;
+  }
   const promptBox = data.scene_positive
     ? `<details style="margin-top:10px; font-size:11px; color:var(--muted);">
          <summary style="cursor:pointer;">사용된 프롬프트 보기</summary>
