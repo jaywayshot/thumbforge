@@ -203,7 +203,47 @@
         </div>
         <div id="uploadMeta" class="badges"></div>
 
-        <h2 style="margin-top:24px;">2. 옵션</h2>
+        <h2 style="margin-top:24px;">2. 제품 정보</h2>
+        <div class="row">
+          <div><label>카테고리</label><select id="pi_category"></select></div>
+          <div><label>하위 분류</label><select id="pi_sub"></select></div>
+        </div>
+        <div class="row">
+          <div><label>제품명</label><input id="pi_name" type="text" placeholder="예: 원목 책상" /></div>
+          <div><label>브랜드명</label><input id="pi_brand" type="text" placeholder="예: 무지" /></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin:12px 0 6px;">
+          <label style="margin:0;">사이즈 (cm)</label>
+          <label style="margin:0; font-size:11px;"><input type="checkbox" id="pi_use_label" style="width:auto;" /> S/M/L로 입력</label>
+        </div>
+        <div class="row" id="pi_size_cm" style="grid-template-columns:1fr 1fr 1fr;">
+          <input id="pi_w" type="number" placeholder="가로" />
+          <input id="pi_h" type="number" placeholder="세로" />
+          <input id="pi_d" type="number" placeholder="깊이" />
+        </div>
+        <select id="pi_size_label" style="display:none;">
+          <option value="">사이즈 선택</option><option>S</option><option>M</option><option>L</option>
+        </select>
+        <div class="row">
+          <div><label>재질</label><input id="pi_material" type="text" placeholder="예: 원목, 메탈" /></div>
+          <div><label>색상</label><input id="pi_color" type="text" placeholder="예: 화이트, 베이지" /></div>
+        </div>
+        <div class="row">
+          <div><label>사용 공간</label><select id="pi_space"></select></div>
+          <div><label>타겟</label><input id="pi_target" type="text" placeholder="예: 1인 가구" /></div>
+        </div>
+        <label>무드 키워드 (클릭하여 선택)</label>
+        <div id="pi_moods" class="badges"></div>
+
+        <h2 style="margin-top:24px;">레퍼런스 이미지 (선택)</h2>
+        <div id="refDrop" class="drop" style="padding:18px;">
+          <div class="ico" style="font-size:20px;">🖼️</div>
+          <div id="refDropLabel" style="font-size:12px;">"이런 느낌" 이미지를 올리면 색/무드 반영</div>
+          <input id="refFile" type="file" accept="image/*" />
+        </div>
+        <div id="refResult" class="badges"></div>
+
+        <h2 style="margin-top:24px;">3. 옵션</h2>
         <label>컨셉</label>
         <select id="concept"></select>
         <label>플랫폼</label>
@@ -214,7 +254,7 @@
         <div class="row">
           <div>
             <label>생성 개수</label>
-            <input id="variants" type="number" min="1" max="8" value="4" />
+            <input id="variants" type="number" min="1" max="4" value="1" />
           </div>
           <div>
             <label>할인 %</label>
@@ -234,6 +274,7 @@
         <input id="badge" type="text" placeholder="예: BEST" />
         <div id="llmMsg" style="font-size:11px; color:var(--muted); margin-top:6px;"></div>
 
+        <div id="costNote" style="font-size:12px; color:var(--muted); margin-top:14px; text-align:center;"></div>
         <button id="genBtn" class="primary" disabled>썸네일 생성하기</button>
       </div>
 
@@ -424,6 +465,116 @@ async function loadOptions() {
 }
 loadOptions();
 
+/* 제품 정보 (categories_v2) */
+let CATS_V2 = {};
+let selectedMoods = new Set();
+let currentReference = null;
+
+async function loadCategoriesV2() {
+  try {
+    CATS_V2 = await (await fetch(API + "/api/categories/v2")).json();
+    const opts = `<option value="">(없음 · mock 배경)</option>` +
+      Object.keys(CATS_V2).map(k => `<option value="${k}">${k}</option>`).join("");
+    $("#pi_category").innerHTML = opts;
+    onCategoryChange();
+  } catch (e) { console.error(e); }
+}
+
+function onCategoryChange() {
+  const cat = $("#pi_category").value;
+  const meta = CATS_V2[cat];
+  // 하위 분류
+  $("#pi_sub").innerHTML = `<option value="">(선택)</option>` +
+    ((meta && meta.sub_categories) || []).map(s => `<option>${s}</option>`).join("");
+  // 사용 공간
+  $("#pi_space").innerHTML = `<option value="">(선택)</option>` +
+    ((meta && meta.use_spaces) || []).map(s => `<option>${s}</option>`).join("");
+  // 무드 칩
+  selectedMoods.clear();
+  const moods = (meta && meta.mood_keywords) || [];
+  $("#pi_moods").innerHTML = moods.map(m =>
+    `<span class="tag" data-m="${m}" style="cursor:pointer;">${m}</span>`).join("")
+    || `<span style="font-size:11px; color:var(--muted);">카테고리를 선택하세요</span>`;
+  $("#pi_moods").querySelectorAll(".tag").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const m = chip.dataset.m;
+      if (selectedMoods.has(m)) { selectedMoods.delete(m); chip.style.background = ""; chip.style.color = ""; }
+      else { selectedMoods.add(m); chip.style.background = "var(--accent)"; chip.style.color = "#fff"; }
+    });
+  });
+  updateCostNote();
+}
+$("#pi_category").addEventListener("change", onCategoryChange);
+
+// 사이즈 cm ↔ S/M/L 토글
+$("#pi_use_label").addEventListener("change", e => {
+  const useLabel = e.target.checked;
+  $("#pi_size_cm").style.display = useLabel ? "none" : "grid";
+  $("#pi_size_label").style.display = useLabel ? "block" : "none";
+});
+
+function buildProductInfo() {
+  const cat = $("#pi_category").value;
+  if (!cat) return null;  // 카테고리 미선택 → 기존 mock 경로
+  const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+  return {
+    product_name: $("#pi_name").value || null,
+    brand_name: $("#pi_brand").value || null,
+    category: cat,
+    sub_category: $("#pi_sub").value || null,
+    size_w: num("#pi_w"), size_h: num("#pi_h"), size_d: num("#pi_d"),
+    size_label: $("#pi_size_label").value || null,
+    material: $("#pi_material").value || null,
+    color: $("#pi_color").value || null,
+    use_space: $("#pi_space").value || null,
+    target_audience: $("#pi_target").value || null,
+    mood_keywords: [...selectedMoods],
+  };
+}
+
+function updateCostNote() {
+  const cat = $("#pi_category").value;
+  const n = parseInt($("#variants").value) || 1;
+  if (cat) $("#costNote").innerHTML =
+    `💳 예상 비용: 약 <strong>${25 * n}원</strong> (Stability AI ${n}장, 키 없으면 mock 무료)`;
+  else $("#costNote").innerHTML = `무료 (mock 그라데이션 배경 — 라이프스타일은 카테고리를 선택하세요)`;
+}
+$("#variants").addEventListener("input", updateCostNote);
+loadCategoriesV2();
+
+/* 레퍼런스 이미지 */
+const refDrop = $("#refDrop"), refFile = $("#refFile");
+refDrop.addEventListener("click", () => refFile.click());
+refDrop.addEventListener("dragover", e => { e.preventDefault(); refDrop.classList.add("hover"); });
+refDrop.addEventListener("dragleave", () => refDrop.classList.remove("hover"));
+refDrop.addEventListener("drop", e => {
+  e.preventDefault(); refDrop.classList.remove("hover");
+  if (e.dataTransfer.files.length) handleReference(e.dataTransfer.files[0]);
+});
+refFile.addEventListener("change", () => refFile.files.length && handleReference(refFile.files[0]));
+
+async function handleReference(file) {
+  $("#refResult").innerHTML = `<span class="tag">⏳ 분석 중...</span>`;
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const res = await fetch(API + "/api/reference/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    currentReference = data.reference_id;
+    const swatches = (data.dominant_hex || []).map(h =>
+      `<span class="swatch" style="background:${h}; display:inline-block; width:16px; height:16px; border-radius:3px; vertical-align:middle;"></span>`).join("");
+    $("#refResult").innerHTML =
+      `<img src="${URL.createObjectURL(file)}" style="height:40px; border-radius:6px; vertical-align:middle;" /> ` +
+      swatches +
+      ` <span class="tag">${data.tone}</span>` +
+      (data.moods || []).map(m => `<span class="tag">${m}</span>`).join("") +
+      ` <span class="tag" style="cursor:pointer; border-color:var(--danger); color:var(--danger);" onclick="clearReference()">✕ 제거</span>`;
+  } catch (e) {
+    $("#refResult").innerHTML = `<span class="tag warn">분석 실패: ${e.message}</span>`;
+  }
+}
+window.clearReference = () => { currentReference = null; $("#refResult").innerHTML = ""; refFile.value = ""; };
+
 /* 단일 */
 const drop = $("#drop"), fileInput = $("#file"), preview = $("#preview");
 const genBtn = $("#genBtn"), results = $("#results"), uploadMeta = $("#uploadMeta");
@@ -467,16 +618,15 @@ async function handleFile(file) {
   }
 }
 
-genBtn.addEventListener("click", async () => {
-  if (!currentUpload) return;
-  genBtn.disabled = true;
-  results.innerHTML = `<div class="loader"></div><div class="progress">생성 중... (첫 실행 시 1~2분)</div>`;
+function buildGenBody(opts = {}) {
   const body = {
     upload_id: currentUpload,
     concept: $("#concept").value,
     platform: $("#platform").value,
-    variants: parseInt($("#variants").value) || 4,
+    variants: opts.variants || (parseInt($("#variants").value) || 1),
     brand_id: $("#brand").value || null,
+    reference_id: currentReference || null,
+    fresh: !!opts.fresh,
     text: {
       headline: $("#headline").value || null,
       sub_text: $("#sub").value || null,
@@ -484,51 +634,79 @@ genBtn.addEventListener("click", async () => {
       discount_percent: parseInt($("#discount").value) || null,
     },
   };
+  const pi = buildProductInfo();
+  if (pi) body.product_info = pi;
+  return body;
+}
+
+async function runGenerate(opts = {}) {
+  if (!currentUpload) return;
+  genBtn.disabled = true;
+  const append = !!opts.append;
+  if (!append) results.innerHTML = `<div class="loader"></div><div class="progress">생성 중... (AI 배경 생성은 10~30초)</div>`;
   try {
     const res = await fetch(API + "/api/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(buildGenBody(opts)),
     });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.statusText); }
-    renderResults(await res.json());
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    renderResults(data, append);
   } catch (e) {
-    results.innerHTML = `<div class="err">생성 실패: ${e.message}</div>`;
+    if (!append) results.innerHTML = `<div class="err">생성 실패: ${e.message}</div>`;
+    else showToast("추가 생성 실패: " + e.message);
   } finally { genBtn.disabled = false; }
-});
+}
 
-function renderResults(data) {
-  const grid = data.variants.map(v => {
-    const cls = v.ctr_score >= 75 ? "" : v.ctr_score >= 55 ? "mid" : "low";
-    const notes = v.qc_notes && v.qc_notes.length
-      ? `<div class="notes">⚠ ${v.qc_notes.join(" · ")}</div>` : "";
-    // 전역 variant ID = job_id + "_" + variant_id (서버가 메타 복원에 사용)
-    const gid = `${data.job_id}_${v.variant_id}`;
-    return `
-      <div class="card">
-        <div class="card-img"><img src="${API}${v.file_url}" /></div>
-        <div class="card-body">
-          <div class="card-meta">
-            <span>${v.variant_id} · ${v.layout_used}</span>
-            <span class="ctr ${cls}">CTR ${v.ctr_score}</span>
-          </div>
-          ${notes}
-          <a class="dl" href="${API}${v.file_url}" download="${v.variant_id}.png">⬇ 다운로드</a>
-          <div class="fb">
-            <button class="fb-btn" data-t="winner" title="이거 좋다"
-                    onclick="sendFeedback('${gid}','winner',this)">👍</button>
-            <button class="fb-btn" data-t="loser" title="이거 별로다"
-                    onclick="sendFeedback('${gid}','loser',this)">👎</button>
-            <button class="fb-btn" data-t="discard" title="안 쓸 거다"
-                    onclick="sendFeedback('${gid}','discard',this)">✕</button>
-          </div>
+genBtn.addEventListener("click", () => runGenerate());
+
+function _variantCard(data, v) {
+  const cls = v.ctr_score >= 75 ? "" : v.ctr_score >= 55 ? "mid" : "low";
+  const notes = v.qc_notes && v.qc_notes.length
+    ? `<div class="notes">⚠ ${v.qc_notes.join(" · ")}</div>` : "";
+  const gid = `${data.job_id}_${v.variant_id}`;  // 전역 variant ID (서버 메타 복원)
+  return `
+    <div class="card">
+      <div class="card-img"><img src="${API}${v.file_url}" /></div>
+      <div class="card-body">
+        <div class="card-meta">
+          <span>${v.variant_id} · ${v.layout_used}</span>
+          <span class="ctr ${cls}">CTR ${v.ctr_score}</span>
         </div>
-      </div>`;
-  }).join("");
+        ${notes}
+        <a class="dl" href="${API}${v.file_url}" download="${v.variant_id}.png">⬇ 다운로드</a>
+        <div class="fb">
+          <button class="fb-btn" data-t="winner" title="이거 좋다" onclick="sendFeedback('${gid}','winner',this)">👍</button>
+          <button class="fb-btn" data-t="loser" title="이거 별로다" onclick="sendFeedback('${gid}','loser',this)">👎</button>
+          <button class="fb-btn" data-t="discard" title="안 쓸 거다" onclick="sendFeedback('${gid}','discard',this)">✕</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderResults(data, append = false) {
+  const cards = data.variants.map(v => _variantCard(data, v)).join("");
+  if (append) {
+    const g = results.querySelector(".results-grid");
+    if (g) { g.insertAdjacentHTML("beforeend", cards); return; }
+  }
+  const sceneTag = data.bg_mode === "scene"
+    ? `<span class="tag" style="border-color:var(--success); color:var(--success);">AI 라이프스타일 배경</span>` : "";
+  const promptBox = data.scene_positive
+    ? `<details style="margin-top:10px; font-size:11px; color:var(--muted);">
+         <summary style="cursor:pointer;">사용된 프롬프트 보기</summary>
+         <div style="margin-top:6px;"><strong>positive:</strong> ${data.scene_positive}</div>
+         <div style="margin-top:4px;"><strong>negative:</strong> ${data.scene_negative}</div>
+       </details>` : "";
   results.innerHTML = `
     <div style="color:var(--muted); font-size:13px; margin-bottom:12px;">
-      ${data.variants.length}개 · ${data.elapsed_ms}ms · ${data.concept} · ${data.platform}
+      ${data.variants.length}개 · ${data.elapsed_ms}ms · ${data.concept} · ${data.platform} ${sceneTag}
     </div>
-    <div class="results-grid">${grid}</div>`;
+    <div class="results-grid">${cards}</div>
+    <button id="moreBtn" class="secondary" style="margin-top:16px;">+ 같은 설정으로 1장 더 만들기</button>
+    ${promptBox}`;
+  const mb = $("#moreBtn");
+  if (mb) mb.addEventListener("click", () => runGenerate({ variants: 1, fresh: true, append: true }));
 }
 
 /* 피드백 */

@@ -12,6 +12,7 @@ from app.services.concept_loader import (
     get_concepts,
     get_platforms,
     get_categories,
+    get_categories_v2,
 )
 
 router = APIRouter(prefix="/api", tags=["generate"])
@@ -44,6 +45,12 @@ async def list_platforms() -> dict:
         k: {"label": v.get("label", k), "sizes": v.get("sizes", {})}
         for k, v in get_platforms().items()
     }
+
+
+@router.get("/categories/v2")
+async def list_categories_v2() -> dict:
+    """라이프스타일 신 생성용 카테고리 마스터 (UI 제품정보 입력용)."""
+    return get_categories_v2()
 
 
 @router.get("/categories")

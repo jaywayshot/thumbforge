@@ -240,4 +240,7 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
         platform=req.platform,
         variants=variants,
         elapsed_ms=elapsed,
+        bg_mode="scene" if scene_mode else "mock",
+        scene_positive=scene_pos if scene_mode else None,
+        scene_negative=scene_neg if scene_mode else None,
     )
