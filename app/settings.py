@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     default_variants: int = 4
     output_size: int = 1000
 
+    # ── 백그라운드 작업 ──
+    # 기본 False → 기존 스레드풀. True + celery 설치 + redis 가동 시 Celery 워커.
+    use_celery: bool = False
+    redis_url: str = "redis://localhost:6379/0"
+
     # ── 경로 헬퍼 ──
     @property
     def workspace_path(self) -> Path:

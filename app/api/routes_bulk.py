@@ -6,8 +6,8 @@ import json
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.jobs.bulk_worker import run_bulk_job
-from app.jobs.registry import registry, run_in_background
+from app.jobs.celery_app import dispatch_bulk_job
+from app.jobs.registry import registry
 from app.settings import settings
 
 router = APIRouter(prefix="/api/bulk", tags=["bulk"])
@@ -39,8 +39,7 @@ async def bulk_upload(
         meta={"concept": concept, "platform": platform, "variants_per_image": variants_per_image},
     )
 
-    run_in_background(
-        run_bulk_job,
+    mode = dispatch_bulk_job(
         job_id=job.job_id,
         zip_bytes=contents,
         concept=concept,
@@ -50,7 +49,12 @@ async def bulk_upload(
         category_hint=category_hint or None,
     )
 
-    return {"job_id": job.job_id, "status": "pending", "poll_url": f"/api/bulk/status/{job.job_id}"}
+    return {
+        "job_id": job.job_id,
+        "status": "pending",
+        "dispatch": mode,
+        "poll_url": f"/api/bulk/status/{job.job_id}",
+    }
 
 
 @router.get("/status/{job_id}")
