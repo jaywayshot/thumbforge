@@ -20,6 +20,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.analyzers import cache as comp_cache
+from app.analyzers.sites import (
+    CoupangAdapter,
+    ElevenStAdapter,
+    GenericAdapter,
+    NaverShoppingAdapter,
+    detect_adapter,
+    supported_sites,
+)
 from app.analyzers.competitor import (
     HARD_MAX_ITEMS,
     RobotsBlockedError,
@@ -81,6 +89,54 @@ def test_parse_thumbnail_urls():
 def test_parse_empty_html():
     assert parse_thumbnail_urls("<html><body>no products</body></html>", "https://x.com") == []
     print("  ✓ 상품 없는 HTML → 빈 리스트")
+
+
+# ───────── 사이트 어댑터 ─────────
+
+def test_detect_adapter_by_domain():
+    assert detect_adapter("https://www.coupang.com/np/search?q=x").name == "coupang"
+    assert detect_adapter("https://search.11st.co.kr/Search.tmall?kwd=x").name == "11st"
+    assert detect_adapter("https://search.shopping.naver.com/search/all?query=x").name == "naver_shopping"
+    assert detect_adapter("https://example.com/foo").name == "generic"
+    assert isinstance(detect_adapter("https://example.com/foo"), GenericAdapter)
+    print("  ✓ 도메인 기반 사이트 어댑터 감지")
+
+
+def test_11st_adapter_parse():
+    html = """
+    <div class="c_card_item">
+      <img class="img_plot" data-original="//cdn.011st.com/11dims/thumb/a.jpg">
+    </div>
+    <div class="c_listing"><img src="https://cdn.011st.com/b.jpg"></div>
+    """
+    urls = ElevenStAdapter().parse_thumbnail_urls(html, "https://search.11st.co.kr/Search.tmall?kwd=x")
+    assert "https://cdn.011st.com/11dims/thumb/a.jpg" in urls
+    assert "https://cdn.011st.com/b.jpg" in urls
+    print(f"  ✓ 11번가 어댑터 파싱: {len(urls)}개")
+
+
+def test_naver_adapter_parse():
+    html = """
+    <li class="basicList_item"><img src="https://shopping-phinf.pstatic.net/a.jpg"></li>
+    <div class="product_item"><img data-src="https://shopping-phinf.pstatic.net/b.jpg"></div>
+    """
+    urls = NaverShoppingAdapter().parse_thumbnail_urls(html, "https://search.shopping.naver.com/search/all?query=x")
+    assert "https://shopping-phinf.pstatic.net/a.jpg" in urls
+    assert "https://shopping-phinf.pstatic.net/b.jpg" in urls
+    print(f"  ✓ 네이버 쇼핑 어댑터 파싱: {len(urls)}개")
+
+
+def test_coupang_adapter_still_works():
+    urls = CoupangAdapter().parse_thumbnail_urls(COUPANG_HTML, "https://www.coupang.com/np/search?q=x")
+    assert len(urls) == 2
+    print("  ✓ 쿠팡 어댑터 유지(리팩토링 후 동일)")
+
+
+def test_supported_sites_list():
+    sites = supported_sites()
+    names = {s["name"] for s in sites}
+    assert {"coupang", "11st", "naver_shopping"} <= names
+    print(f"  ✓ 지원 사이트 목록: {sorted(names)}")
 
 
 # ───────── 색상 추출 ─────────
@@ -217,6 +273,8 @@ def test_analyze_competitor_with_mocks():
     assert res["analyzed_count"] == 2  # data: 제외하고 2개
     assert res["thumbnails_found"] == 2
     assert res["fetch_failed"] == 0
+    assert res["site"] == "coupang"  # URL 도메인으로 감지
+    assert res["site_label"] == "쿠팡"
     assert res["dominant_colors"]
     assert res["bg_tone_distribution"]
     assert all(c in get_concepts() for c in res["suggested_concepts"])
@@ -280,6 +338,18 @@ def test_api_bad_url():
     print("  ✓ API: 잘못된 URL → 400")
 
 
+def test_api_sites_endpoint():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    r = client.get("/api/analyze/sites")
+    assert r.status_code == 200
+    names = {s["name"] for s in r.json()["sites"]}
+    assert {"coupang", "11st", "naver_shopping"} <= names
+    print(f"  ✓ API: 지원 사이트 목록 {sorted(names)}")
+
+
 def test_api_cache_hit_no_network():
     """캐시를 미리 채워두면 라우트가 네트워크 없이 캐시를 반환한다."""
     from fastapi.testclient import TestClient
@@ -329,6 +399,11 @@ if __name__ == "__main__":
     print("\n=== 경쟁사 분석 테스트 ===")
     test_parse_thumbnail_urls()
     test_parse_empty_html()
+    test_detect_adapter_by_domain()
+    test_11st_adapter_parse()
+    test_naver_adapter_parse()
+    test_coupang_adapter_still_works()
+    test_supported_sites_list()
     test_quantize_dominant_colors()
     test_classify_bg_tone()
     test_estimate_text_area_ratio()
@@ -342,6 +417,7 @@ if __name__ == "__main__":
     test_cache_roundtrip()
     test_cache_key_differs()
     test_api_bad_url()
+    test_api_sites_endpoint()
     test_api_cache_hit_no_network()
     test_live_coupang_optional()
     print("\n✅ 경쟁사 분석 테스트 전체 통과")

@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import io
 import time
-from typing import Callable, Dict, List, Optional, Tuple
-from urllib.parse import urljoin, urlparse
+from typing import Callable, Dict, List, Optional
+from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
 import numpy as np
-from bs4 import BeautifulSoup
 from PIL import Image, ImageFilter
 
+from app.analyzers.sites import detect_adapter
 from app.services.concept_loader import get_concepts
 
 # ───────── 상수 ─────────
@@ -89,47 +89,14 @@ def is_allowed_by_robots(
     return rp.can_fetch(user_agent, url)
 
 
-# ───────── HTML 파싱: 썸네일 URL 추출 ─────────
+# ───────── HTML 파싱: 썸네일 URL 추출 (사이트 어댑터 위임) ─────────
 
 def parse_thumbnail_urls(html: str, base_url: str) -> List[str]:
     """
-    쿠팡 검색결과 HTML 에서 상품 썸네일 이미지 URL 들을 추출한다.
-    쿠팡은 상품 목록 img 에 보통 'search-product-wrap-img' 클래스를 쓰고,
-    실제 주소는 data-img-src(지연 로딩) 또는 src 에 들어있다.
-    구조 변경에 대비해 몇 가지 후보를 순서대로 시도한다.
+    base_url 도메인으로 사이트를 감지해 해당 어댑터의 추출 규칙을 적용한다.
+    (쿠팡/11번가/네이버쇼핑/제네릭 — app/analyzers/sites.py)
     """
-    soup = BeautifulSoup(html, "html.parser")
-    urls: List[str] = []
-    seen = set()
-
-    def _push(raw: Optional[str]) -> None:
-        if not raw:
-            return
-        raw = raw.strip()
-        if not raw or raw.startswith("data:"):
-            return
-        full = urljoin(base_url, raw)
-        if full not in seen:
-            seen.add(full)
-            urls.append(full)
-
-    # 1순위: 쿠팡 상품 목록 이미지 클래스
-    for img in soup.select("img.search-product-wrap-img, li.search-product img"):
-        _push(img.get("data-img-src") or img.get("src"))
-
-    # 2순위(폴백): 상품 목록(ul#productList) 안의 모든 img
-    if not urls:
-        for img in soup.select("ul#productList img, #product-list img"):
-            _push(img.get("data-img-src") or img.get("src"))
-
-    # 3순위(최후 폴백): thumbnail 이 들어간 이미지 도메인만 채택
-    if not urls:
-        for img in soup.find_all("img"):
-            src = img.get("data-img-src") or img.get("src") or ""
-            if "thumbnail" in src or "image" in src:
-                _push(src)
-
-    return urls
+    return detect_adapter(base_url).parse_thumbnail_urls(html, base_url)
 
 
 # ───────── 단일 이미지 분석 ─────────
@@ -366,22 +333,24 @@ def analyze_competitor(
     robots_text: Optional[str] = None,
 ) -> Dict:
     """
-    쿠팡 검색결과 URL → 상위 N개 썸네일 분석 결과.
+    검색결과 URL(쿠팡/11번가/네이버쇼핑/제네릭) → 상위 N개 썸네일 분석 결과.
+    URL 도메인으로 사이트 어댑터를 자동 감지한다.
     네트워크 후크(html_fetcher/image_fetcher)는 테스트에서 주입 가능.
     동기 함수 — async 라우트에서는 run_in_threadpool 로 호출.
     """
     max_items = max(1, min(int(max_items), HARD_MAX_ITEMS))
+    adapter = detect_adapter(url)
 
     if respect_robots and not is_allowed_by_robots(url, robots_text=robots_text):
         raise RobotsBlockedError(
-            "robots.txt 규칙상 해당 URL 수집이 금지되어 있습니다. 분석을 중단했습니다."
+            f"robots.txt 규칙상 해당 URL({adapter.label}) 수집이 금지되어 있습니다. 분석을 중단했습니다."
         )
 
     fetch_html = html_fetcher or _default_html_fetcher
     fetch_image = image_fetcher or _default_image_fetcher
 
     html = fetch_html(url)
-    thumb_urls = parse_thumbnail_urls(html, base_url=url)[:max_items]
+    thumb_urls = adapter.parse_thumbnail_urls(html, base_url=url)[:max_items]
 
     items: List[Dict] = []
     failed = 0
@@ -400,6 +369,8 @@ def analyze_competitor(
     agg = aggregate_results(items)
     agg["suggested_concepts"] = suggest_concepts_from_analysis(agg)
     agg["source_url"] = url
+    agg["site"] = adapter.name
+    agg["site_label"] = adapter.label
     agg["thumbnails_found"] = len(thumb_urls)
     agg["fetch_failed"] = failed
     # OCR 미구현 — 추후 표시용 자리만 둔다
