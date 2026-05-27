@@ -10,7 +10,7 @@ import math
 from typing import Optional
 
 import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 from app.core.layout import Box, Layout
 from app.core.placement import PlacementRule, compute_position
@@ -95,7 +95,7 @@ def fit_product_by_placement(
 
 
 def harmonize_with_background(product_rgba: Image.Image, background: Image.Image) -> Image.Image:
-    """제품 명도/채도를 배경과 어울리게 ±5% 미세 조정(원형 보존, 알파 유지)."""
+    """제품 명도/채도를 배경과 어울리게 조정(원형 보존, 알파 유지). 합성 티 완화."""
     prod = product_rgba.convert("RGBA")
     r, g, b, a = prod.split()
     rgb = Image.merge("RGB", (r, g, b))
@@ -109,10 +109,27 @@ def harmonize_with_background(product_rgba: Image.Image, background: Image.Image
 
     factor = 1.0
     if prod_lum > 1:
-        factor = max(0.95, min(1.05, bg_lum / prod_lum))  # ±5% clamp
+        factor = max(0.90, min(1.10, bg_lum / prod_lum))  # ±10% clamp
     rgb = ImageEnhance.Brightness(rgb).enhance(factor)
-    rgb = ImageEnhance.Color(rgb).enhance(0.97)  # 채도 살짝 낮춰 배경과 조화
+    rgb = ImageEnhance.Color(rgb).enhance(0.92)   # 채도 낮춰 배경과 조화(튐 방지)
+    rgb = ImageEnhance.Contrast(rgb).enhance(0.97)
     return Image.merge("RGBA", (*rgb.split(), a))
+
+
+def paste_contact_shadow(canvas: Image.Image, pos: tuple[int, int], size: tuple[int, int],
+                         blur: int = 22, opacity: int = 90) -> None:
+    """제품 밑면에 바닥 접지 타원 그림자 — '바닥에 놓인' 느낌(붕 뜨는 것 방지)."""
+    px, py = pos
+    pw, ph = size
+    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    dd = ImageDraw.Draw(layer)
+    cx = px + pw // 2
+    cy = py + ph - max(4, int(ph * 0.03))      # 제품 밑면 근처
+    ew = int(pw * 0.82)
+    eh = max(10, int(pw * 0.13))               # 납작한 타원
+    dd.ellipse([cx - ew // 2, cy - eh // 2, cx + ew // 2, cy + eh // 2],
+               fill=(0, 0, 0, opacity))
+    canvas.alpha_composite(layer.filter(ImageFilter.GaussianBlur(blur)))
 
 
 def make_drop_shadow(product_rgba: Image.Image, blur: int = 20, opacity: int = 110, offset_y: int = 15) -> Image.Image:
@@ -199,9 +216,14 @@ def compose_thumbnail(
         # 카테고리별 배치: 배경과 색 조화 후 anchor/크기/그림자 규칙 적용
         prod_src = harmonize_with_background(product_rgba, background) if placement.harmonize else product_rgba
         product_fitted, pos = fit_product_by_placement(prod_src, canvas.width, canvas.height, placement)
-        shadow = make_drop_shadow(product_fitted, blur=placement.shadow_blur,
-                                  opacity=placement.shadow_opacity, offset_y=placement.shadow_offset_y)
-        canvas.alpha_composite(shadow, (pos[0], pos[1] + placement.shadow_offset_y))
+        if placement.contact_shadow:
+            # 바닥 접지 그림자(가구/식품/전자 등) — 바닥에 놓인 느낌
+            paste_contact_shadow(canvas, pos, product_fitted.size,
+                                 blur=placement.shadow_blur, opacity=placement.shadow_opacity)
+        else:
+            shadow = make_drop_shadow(product_fitted, blur=placement.shadow_blur,
+                                      opacity=placement.shadow_opacity, offset_y=placement.shadow_offset_y)
+            canvas.alpha_composite(shadow, (pos[0], pos[1] + placement.shadow_offset_y))
         canvas.alpha_composite(product_fitted, pos)
     else:
         product_fitted, pos = fit_product_to_box(product_rgba, layout.product_box, max_ratio=0.96)
@@ -225,13 +247,15 @@ def compose_thumbnail(
         )
 
     if sub_text:
-        size = _fit_text_to_box(sub_text, layout.sub_box, bold=False, max_size=int(layout.sub_box.h * 0.85), font_path=bfp)
-        font = get_font(size, bold=False, brand_font_path=bfp)
-        sw = max(1, size // 26) if scene else 0
+        size = _fit_text_to_box(sub_text, layout.sub_box, bold=scene, max_size=int(layout.sub_box.h * 0.85), font_path=bfp)
+        font = get_font(size, bold=scene, brand_font_path=bfp)
+        # scene(사진 배경)에선 옅은 sub_color 대신 진한 text_color + 강한 외곽선으로 가독성 확보
+        sub_draw_color = text_color if scene else sub_color
+        sw = max(2, size // 18) if scene else 0
         draw_text_with_shadow(
             canvas, sub_text, (layout.sub_box.x, layout.sub_box.y),
-            font=font, color=sub_color, shadow=scene,  # scene 이면 그림자 ON(가독성)
-            stroke_width=sw, stroke_color=_contrast_stroke(sub_color) if scene else None,
+            font=font, color=sub_draw_color, shadow=scene,
+            stroke_width=sw, stroke_color=_contrast_stroke(sub_draw_color) if scene else None,
         )
 
     # 3. 뱃지
