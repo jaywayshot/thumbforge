@@ -23,27 +23,33 @@ class PlacementRule:
     shadow_blur: int
     shadow_opacity: int     # 0~255
     shadow_offset_y: int
-    harmonize: bool = True   # 배경과 색/명도 미세 조화
+    harmonize: bool = True   # 배경과 색/명도 조화
+    contact_shadow: bool = False  # 바닥 접지 그림자(가구/식품/전자 등 바닥 제품)
+    bottom_margin: float = 0.90   # bottom anchor 시 바닥 여백(아래에 floor 보이게)
 
 
 # 카테고리 기본값
 _CATEGORY_DEFAULTS = {
-    # 가구: 바닥에, 그림자 강하게(원근감)
-    "가구": PlacementRule("furniture", "bottom", 0.66, 28, 130, 26),
+    # 가구: 바닥에 접지, 바닥 여백 넉넉히
+    "가구": PlacementRule("furniture", "bottom", 0.60, 22, 70, 14,
+                         contact_shadow=True, bottom_margin=0.84),
     # 의류: 매달린 듯, 그림자 약하게
-    "의류": PlacementRule("clothing", "center", 0.70, 16, 60, 10),
-    # 식품: 식탁/카운터 위, 그림자 짧게
-    "식품": PlacementRule("food", "bottom", 0.58, 16, 100, 12),
-    # 전자제품: 데스크 위, 그림자 선명하게
-    "전자제품": PlacementRule("electronics", "bottom", 0.60, 12, 140, 14),
+    "의류": PlacementRule("clothing", "center", 0.68, 16, 55, 10),
+    # 식품: 식탁/카운터 위 접지
+    "식품": PlacementRule("food", "bottom", 0.50, 16, 80, 10,
+                         contact_shadow=True, bottom_margin=0.80),
+    # 전자제품: 데스크 위 접지
+    "전자제품": PlacementRule("electronics", "bottom", 0.52, 14, 90, 12,
+                           contact_shadow=True, bottom_margin=0.82),
     # 뷰티: 진열대, 그림자 부드럽게
-    "뷰티": PlacementRule("beauty", "center", 0.52, 22, 80, 12),
-    # 액세서리: 진열대 클로즈업, 그림자 디테일하게
-    "액세서리": PlacementRule("accessory", "center", 0.50, 14, 110, 10),
-    # 생활용품
-    "생활용품": PlacementRule("household", "bottom", 0.60, 18, 100, 14),
+    "뷰티": PlacementRule("beauty", "center", 0.48, 20, 70, 10),
+    # 액세서리: 진열대 클로즈업
+    "액세서리": PlacementRule("accessory", "center", 0.46, 14, 90, 8),
+    # 생활용품: 바닥/표면 접지
+    "생활용품": PlacementRule("household", "bottom", 0.54, 18, 80, 12,
+                           contact_shadow=True, bottom_margin=0.82),
     # 기타
-    "기타": PlacementRule("default", "center", 0.62, 18, 100, 16),
+    "기타": PlacementRule("default", "center", 0.58, 18, 80, 14),
 }
 
 # 하위 카테고리 미세 조정 (anchor/size override)
@@ -81,7 +87,7 @@ def compute_position(rule: PlacementRule, canvas_w: int, canvas_h: int,
     """배치 규칙에 따른 제품 좌상단 좌표(가로 중앙 정렬, 세로는 anchor)."""
     px = (canvas_w - prod_w) // 2
     if rule.anchor == "bottom":
-        py = int(canvas_h * 0.92) - prod_h          # 바닥 여백 8%
+        py = int(canvas_h * rule.bottom_margin) - prod_h   # 바닥 여백(floor 보이게)
     elif rule.anchor == "top":
         py = int(canvas_h * 0.10)
     else:  # center
