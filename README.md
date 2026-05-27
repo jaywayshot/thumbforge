@@ -146,6 +146,33 @@ curl http://127.0.0.1:8000/api/platforms
 
 ---
 
+## 💻 CLI 배치 생성 (서버 없이)
+
+브라우저/서버 없이 터미널에서 폴더를 일괄 처리합니다. (내부적으로 동일 파이프라인 사용)
+
+```bash
+# 폴더 일괄 처리
+python scripts/generate_cli.py --input ./in --concept white_minimal \
+    --platform coupang --variants 4 --output ./out
+
+# 단일 이미지
+python scripts/generate_cli.py -i product.png -o ./out -c apple_style -n 2
+```
+
+| 옵션 | 설명 | 기본값 |
+|---|---|---|
+| `-i, --input` | 이미지 파일 또는 폴더 (필수) | — |
+| `-o, --output` | 결과 폴더 | `./workspace/cli_out` |
+| `-c, --concept` | 컨셉 이름 | `white_minimal` |
+| `-p, --platform` | 플랫폼 이름 | `coupang` |
+| `-n, --variants` | 이미지당 생성 개수 | `4` |
+| `--category` | 카테고리 힌트(선택) | 파일명 자동 추정 |
+| `--headline` | 헤드라인(비우면 자동 추천) | — |
+
+결과 파일명은 `<원본이름>_v1.png`, `<원본이름>_v2.png` … 형식입니다.
+
+---
+
 ## 🔁 AI Provider 교체
 
 `.env` 파일을 열고:
