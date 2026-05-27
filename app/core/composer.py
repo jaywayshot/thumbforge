@@ -10,9 +10,10 @@ import math
 from typing import Optional
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter
 
 from app.core.layout import Box, Layout
+from app.core.placement import PlacementRule, compute_position
 from app.core.text_overlay import (
     draw_text_with_shadow,
     draw_pill_badge,
@@ -56,6 +57,51 @@ def fit_product_to_box(product_rgba: Image.Image, box: Box, max_ratio: float = 0
     px = box.x + (box.w - new_w) // 2
     py = box.y + (box.h - new_h) // 2
     return resized, (px, py)
+
+
+def _crop_to_alpha(product_rgba: Image.Image) -> Image.Image:
+    if product_rgba.mode != "RGBA":
+        product_rgba = product_rgba.convert("RGBA")
+    alpha = np.array(product_rgba.split()[-1])
+    ys, xs = np.where(alpha > 10)
+    if len(xs) == 0:
+        return product_rgba
+    return product_rgba.crop((int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
+
+
+def fit_product_by_placement(
+    product_rgba: Image.Image, canvas_w: int, canvas_h: int, rule: PlacementRule
+) -> tuple[Image.Image, tuple[int, int]]:
+    """카테고리 배치 규칙에 따라 제품 크기/위치 결정 (원본은 리사이즈만)."""
+    cropped = _crop_to_alpha(product_rgba)
+    cw, ch = cropped.size
+    target = max(1, int(min(canvas_w, canvas_h) * rule.size_ratio))
+    scale = min(target / cw, target / ch)
+    new_w, new_h = max(1, int(cw * scale)), max(1, int(ch * scale))
+    resized = cropped.resize((new_w, new_h), Image.LANCZOS)
+    pos = compute_position(rule, canvas_w, canvas_h, new_w, new_h)
+    return resized, pos
+
+
+def harmonize_with_background(product_rgba: Image.Image, background: Image.Image) -> Image.Image:
+    """제품 명도/채도를 배경과 어울리게 ±5% 미세 조정(원형 보존, 알파 유지)."""
+    prod = product_rgba.convert("RGBA")
+    r, g, b, a = prod.split()
+    rgb = Image.merge("RGB", (r, g, b))
+
+    bg_lum = float(np.asarray(background.convert("L"), dtype=np.float32).mean())
+    pa = np.asarray(a)
+    mask = pa > 10
+    if mask.sum() == 0:
+        return product_rgba
+    prod_lum = float(np.asarray(rgb.convert("L"), dtype=np.float32)[mask].mean())
+
+    factor = 1.0
+    if prod_lum > 1:
+        factor = max(0.95, min(1.05, bg_lum / prod_lum))  # ±5% clamp
+    rgb = ImageEnhance.Brightness(rgb).enhance(factor)
+    rgb = ImageEnhance.Color(rgb).enhance(0.97)  # 채도 살짝 낮춰 배경과 조화
+    return Image.merge("RGBA", (*rgb.split(), a))
 
 
 def make_drop_shadow(product_rgba: Image.Image, blur: int = 20, opacity: int = 110, offset_y: int = 15) -> Image.Image:
@@ -126,6 +172,7 @@ def compose_thumbnail(
     discount_percent: Optional[int] = None,
     logo_path: Optional[object] = None,   # Path or str
     font_path: Optional[object] = None,   # 브랜드 폰트 우선
+    placement: Optional[PlacementRule] = None,  # 카테고리별 배치 규칙(있으면 우선)
 ) -> Image.Image:
     """
     배경 + 제품 + 텍스트 → 최종 썸네일 RGBA
@@ -137,8 +184,17 @@ def compose_thumbnail(
     bfp = str(font_path) if font_path else None
 
     # 1. 제품 배치 (제품은 절대 변형 X, 리사이즈/위치만)
-    product_fitted, pos = fit_product_to_box(product_rgba, layout.product_box, max_ratio=0.96)
-    paste_product_with_shadow(canvas, product_fitted, pos)
+    if placement is not None:
+        # 카테고리별 배치: 배경과 색 조화 후 anchor/크기/그림자 규칙 적용
+        prod_src = harmonize_with_background(product_rgba, background) if placement.harmonize else product_rgba
+        product_fitted, pos = fit_product_by_placement(prod_src, canvas.width, canvas.height, placement)
+        shadow = make_drop_shadow(product_fitted, blur=placement.shadow_blur,
+                                  opacity=placement.shadow_opacity, offset_y=placement.shadow_offset_y)
+        canvas.alpha_composite(shadow, (pos[0], pos[1] + placement.shadow_offset_y))
+        canvas.alpha_composite(product_fitted, pos)
+    else:
+        product_fitted, pos = fit_product_to_box(product_rgba, layout.product_box, max_ratio=0.96)
+        paste_product_with_shadow(canvas, product_fitted, pos)
 
     # 2. 텍스트
     text_color = concept.get("text_color", "#1A1A1A")
