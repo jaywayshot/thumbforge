@@ -13,7 +13,10 @@ from PIL import Image
 from app.core import matting
 from app.core.composer import compose_thumbnail
 from app.core.layout import build_layout, variants_for
-from app.core.qc import estimate_ctr_score, validate_text
+from app.core.placement import get_placement_rules
+from app.core.qc import estimate_ctr_score, qc_scene_check, validate_text
+from app.core.scene_prompt import build_scene_prompt
+from app.core import scene_cache
 from app.models.schemas import GenerateRequest, GenerateResponse, Variant
 from app.providers.factory import (
     get_background_provider,
@@ -95,6 +98,24 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
     bg_provider = get_background_provider()
     qc_provider = get_qc_provider()
 
+    # 5-1. 라이프스타일 신 모드 (product_info 가 있으면 실제 AI 배경 생성)
+    scene_mode = req.product_info is not None
+    scene_provider = None
+    placement_rule = None
+    scene_pos = scene_neg = ""
+    scene_key = ""
+    if scene_mode:
+        from app.providers.stability_provider import StabilityBackgroundProvider
+        from app.services import reference_store
+
+        reference = reference_store.load_reference(req.reference_id) if req.reference_id else None
+        scene_provider = StabilityBackgroundProvider()  # Stability→DALL-E→mock 폴백 내장
+        scene_pos, scene_neg = build_scene_prompt(
+            req.product_info, concept, req.platform, reference, concept_id=req.concept
+        )
+        placement_rule = get_placement_rules(req.product_info.category, req.product_info.sub_category)
+        scene_key = scene_cache.make_key(req.product_info.cache_signature(), req.concept, req.platform)
+
     # 6. variants 루프
     job_id = new_job_id()
     out_dir = job_output_dir(job_id)
@@ -102,38 +123,49 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
     variant_meta: dict[str, dict] = {}  # 피드백 복원용 (variant_id → 메타)
 
     for i in range(max(1, req.variants)):
-        seed = random.randint(1, 10_000_000)
         layout_name = layout_pool[i % len(layout_pool)]
         layout = build_layout(layout_name, width, height)
 
-        bg = bg_provider.generate(width, height, concept, seed=seed)
-
-        # 매 variant마다 문구 살짝 다양화 (A/B 테스트)
-        headline = text_input.headline
-        if not headline and suggested:
-            # 첫 추천 + 변형
-            pool = [suggested["headline"]] + [f"{suggested['headline']} {n+1}" if False else suggested['headline'] for n in range(1)]
-            headline = pool[0] if i == 0 else suggested["headline"]
+        # 문구 결정 (사용자 입력 우선, 비면 추천)
+        headline = text_input.headline or (suggested["headline"] if suggested else None)
         sub = text_input.sub_text or (suggested["sub_text"] if suggested else None)
         badge = text_input.badge or (suggested["badge"] if suggested else None)
-
-        # 컨셉에 headline_max 제한
         headline_max = int(concept.get("headline_max", 14))
         if headline and len(headline) > headline_max:
             headline = headline[:headline_max].rstrip()
 
-        composed = compose_thumbnail(
-            background=bg,
-            product_rgba=product_rgba,
-            layout=layout,
-            concept=concept,
-            headline=headline,
-            sub_text=sub,
-            badge=badge,
-            discount_percent=text_input.discount_percent,
-            logo_path=brand_logo_path,
-            font_path=brand_font_path,
-        )
+        def _render(seed: int, use_cache: bool = True):
+            """배경 생성(+캐시) 후 합성. scene_mode 면 실제 AI 배경, 아니면 기존 provider."""
+            if scene_mode:
+                bgimg = None
+                if use_cache and not req.fresh:
+                    bgimg = scene_cache.get(scene_key)
+                if bgimg is None:
+                    bgimg = scene_provider.generate(width, height, concept, seed=seed,
+                                                     prompt=(scene_pos, scene_neg))
+                    scene_cache.set(scene_key, bgimg)
+                bgimg = bgimg.resize((width, height), Image.LANCZOS)
+            else:
+                bgimg = bg_provider.generate(width, height, concept, seed=seed)
+            return compose_thumbnail(
+                background=bgimg, product_rgba=product_rgba, layout=layout, concept=concept,
+                headline=headline, sub_text=sub, badge=badge,
+                discount_percent=text_input.discount_percent,
+                logo_path=brand_logo_path, font_path=brand_font_path,
+                placement=placement_rule,
+            )
+
+        seed = random.randint(1, 10_000_000)
+        composed = _render(seed)
+
+        # 7. scene QC + 1회 재생성 (scene_mode 만)
+        if scene_mode:
+            scene_issues = qc_scene_check(composed, req.product_info)
+            if scene_issues:
+                import logging
+                logging.getLogger("thumbforge").warning("[scene-qc] 재생성: %s", scene_issues)
+                seed = random.randint(1, 10_000_000)
+                composed = _render(seed, use_cache=False)
 
         # 검수
         qc_report = qc_provider.review(composed, meta={"platform": req.platform})
