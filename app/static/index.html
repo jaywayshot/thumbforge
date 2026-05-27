@@ -299,12 +299,19 @@
   <div id="view-analyze" class="view">
     <div class="analyze-grid">
       <div class="panel">
-        <h2>쿠팡 검색결과 분석</h2>
-        <p style="color:var(--muted); font-size: 13px; margin: 0 0 16px;">
-          쿠팡 검색결과 URL을 넣으면 상위 상품 썸네일의 색감·배경 톤·할인 뱃지 패턴을 분석해
-          적합한 컨셉을 추천합니다. <strong>robots.txt를 존중</strong>하며 정적 HTML만 분석합니다.
+        <h2>경쟁사 검색결과 분석</h2>
+        <p style="color:var(--muted); font-size: 13px; margin: 0 0 12px;">
+          검색결과 URL을 넣으면 상위 상품 썸네일의 색감·배경 톤·할인 뱃지 패턴을 분석해
+          적합한 컨셉을 추천합니다. URL 도메인으로 <strong>쿠팡 / 11번가 / 네이버 쇼핑</strong>을
+          자동 감지하며, <strong>robots.txt를 존중</strong>하고 정적 HTML만 분석합니다.
         </p>
-        <label>쿠팡 검색결과 URL</label>
+        <div class="warn-box" style="margin-bottom: 14px;">
+          ⚠ 현재(2026-05) 세 사이트 모두 정적 HTML 수집이 막혀 있습니다 —
+          쿠팡: 봇 차단(403), 네이버: robots.txt 전면 금지, 11번가: 검색결과가 JS로 렌더(정적 HTML에 상품 없음).
+          실데이터가 필요하면 README의 <strong>쿠팡 파트너스 API</strong> 안내를 참고하세요.
+          로직은 정상이며 사이트가 열리면 즉시 동작합니다.
+        </div>
+        <label>검색결과 URL</label>
         <input id="compUrl" type="text" placeholder="https://www.coupang.com/np/search?q=..." />
         <label>분석 개수 (최대 20)</label>
         <input id="compMax" type="number" min="1" max="20" value="20" />
@@ -697,7 +704,7 @@ function renderAnalysis(d) {
   compResults.innerHTML = `
     ${warn}
     <div style="font-size:12px; color:var(--muted); margin-bottom:16px;">
-      분석 ${d.analyzed_count}개 · 발견 ${d.thumbnails_found} · 실패 ${d.fetch_failed} ${cached}
+      ${d.site_label ? d.site_label + ' · ' : ''}분석 ${d.analyzed_count}개 · 발견 ${d.thumbnails_found} · 실패 ${d.fetch_failed} ${cached}
     </div>
 
     <div class="analyze-section">

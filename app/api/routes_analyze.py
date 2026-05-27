@@ -13,8 +13,15 @@ from app.analyzers.competitor import (
     RobotsBlockedError,
     analyze_competitor,
 )
+from app.analyzers.sites import supported_sites
 
 router = APIRouter(prefix="/api/analyze", tags=["analyze"])
+
+
+@router.get("/sites")
+async def list_supported_sites() -> dict:
+    """인식 가능한 사이트 목록 (UI 안내용)."""
+    return {"sites": supported_sites()}
 
 
 class CompetitorRequest(BaseModel):

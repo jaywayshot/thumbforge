@@ -96,6 +96,44 @@ CTR 점수가 단순 대비/밝기를 넘어 다음 4개 요소의 가중합:
 
 ---
 
+## 🔍 경쟁사 분석 (현재 상태: 수집 차단 — 보류)
+
+브라우저 **경쟁사 분석** 탭 또는 `POST /api/analyze/competitor` 로 검색결과 URL을 넣으면,
+상위 상품 썸네일의 dominant 컬러·배경 톤·할인 뱃지 비율을 분석해 적합한 컨셉을 추천합니다.
+URL 도메인으로 **쿠팡 / 11번가 / 네이버 쇼핑**을 자동 감지하는 어댑터 구조입니다
+(`app/analyzers/sites.py`). 결과는 URL 해시 키로 24시간 캐시됩니다.
+
+> **원칙**: robots.txt 존중 · 정직한 User-Agent · 정적 HTML만 파싱 ·
+> 헤드리스 브라우저/IP 우회/UA 위장 **사용하지 않음**.
+
+### 사이트별 수집 가능 여부 (2026-05 확인)
+
+| 사이트 | robots.txt | 정적 HTML | 상태 |
+|---|---|---|---|
+| 쿠팡 | 403 (Akamai가 robots.txt까지 차단) | 403 Forbidden | ❌ 봇 차단 |
+| 네이버 쇼핑 | `Disallow: /` (ClaudeBot 포함 전면 금지) | 418 | ❌ robots 금지 → 시도 안 함 |
+| 11번가 | ✅ 허용(`Allow: /Search*`) | 상품이 JS(SPA)로 렌더 → 정적 HTML에 상품 이미지 0개 | ⚠ 정적 수집 불가 |
+
+세 사이트 모두 **허용된 방법(정적 HTML)으로는 실데이터를 얻을 수 없어 현재 보류** 상태입니다.
+코드/어댑터/추천 로직은 그대로 유지되며, **어느 사이트가 정적 HTML을 제공하면 셀렉터만으로 즉시 동작**합니다.
+로직 정확성은 모킹 HTML 기반 단위 테스트(`tests/test_competitor.py`)로 검증됩니다.
+
+### 실데이터가 필요할 때 — 쿠팡 파트너스 OPEN API (권장 경로)
+
+스크래핑 대신 **공식 제휴 API**를 사용하세요. 약관을 준수하며 차단 없이 상품 데이터를 받습니다.
+
+1. 쿠팡 파트너스 가입: <https://partners.coupang.com> → 회원가입/사업자 인증
+2. 승인 후 **액세스 키 / 시크릿 키** 발급 (마이페이지 → OPEN API)
+3. 상품 검색 API: `GET /v2/providers/affiliate_open_api/apis/openapi/v1/products/search`
+   (HMAC 서명 헤더 `Authorization: CEA algorithm=..., signature=...` 필요)
+4. 발급받은 키를 `.env`에 추가 후, `app/analyzers/sites.py`에 파트너스-API 어댑터를 추가하면
+   기존 분석 파이프라인을 그대로 재사용할 수 있습니다.
+
+> 네이버는 쇼핑 검색 스크래핑을 robots.txt로 금지하므로, 네이버 쇼핑 데이터가 필요하면
+> **네이버 검색 OPEN API / 쇼핑파트너센터** 등 공식 채널을 사용해야 합니다.
+
+---
+
 
 
 ### 1) 업로드
@@ -355,7 +393,7 @@ sudo apt install fonts-nanum
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
 | 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | ✅ (TEXT_PROVIDER=openai/anthropic, 키 없으면 mock 폴백) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
-| 다음 | 경쟁사 URL 분석 (쿠팡 상위 썸네일 색감/문구 패턴) | ✅ (정적 HTML 분석, robots.txt 존중, 24h 캐시. 한글 단어 빈도는 OCR 추후) |
+| 다음 | 경쟁사 URL 분석 (쿠팡/11번가/네이버 어댑터, 색감/뱃지 패턴 → 컨셉 추천) | ⚠️ 구현 완료·**실수집 보류**: 3사 모두 정적 HTML 차단(상단 "경쟁사 분석" 절 참고). 공식 API 경로 안내. 모킹 로직 검증 유지 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
 | 확장 | 유튜브 썸네일 / 쇼츠·릴스 / 광고 소재 / 상세페이지 자동 생성 | 🔜 |
 
