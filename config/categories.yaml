@@ -1,0 +1,59 @@
+# ============================================================
+#  제품 카테고리 → 추천 컨셉 매핑
+# ============================================================
+
+categories:
+
+  health_food:
+    label: "건강식품"
+    keywords: ["비타민", "영양제", "건강", "프로틴", "단백질", "콜라겐", "유산균", "오메가"]
+    recommended_concepts: [health_food, white_minimal, smartstore_emotional]
+    default_layout: center_product_top_text
+
+  electronics:
+    label: "전자제품"
+    keywords: ["이어폰", "헤드폰", "키보드", "마우스", "충전기", "노트북", "모니터", "스마트워치"]
+    recommended_concepts: [tech_electronics, apple_style, black_luxury]
+    default_layout: left_product_right_text
+
+  kitchen:
+    label: "주방용품"
+    keywords: ["냄비", "프라이팬", "도마", "칼", "주방", "그릇", "수저"]
+    recommended_concepts: [white_minimal, smartstore_emotional, brand_shop]
+    default_layout: center_product
+
+  fashion:
+    label: "패션"
+    keywords: ["옷", "셔츠", "바지", "원피스", "신발", "가방", "악세서리"]
+    recommended_concepts: [instagram_aesthetic, female_emotional, brand_shop]
+    default_layout: center_product
+
+  car:
+    label: "차량용품"
+    keywords: ["자동차", "차량", "거치대", "블랙박스", "방향제"]
+    recommended_concepts: [tech_electronics, black_luxury, sports]
+    default_layout: left_product_right_text
+
+  pet:
+    label: "반려동물"
+    keywords: ["강아지", "고양이", "사료", "장난감", "반려"]
+    recommended_concepts: [kids, smartstore_emotional, female_emotional]
+    default_layout: center_product
+
+  camping:
+    label: "캠핑"
+    keywords: ["캠핑", "텐트", "쿨러", "버너", "캠프"]
+    recommended_concepts: [sports, brand_shop, summer]
+    default_layout: center_product
+
+  beauty:
+    label: "뷰티"
+    keywords: ["화장품", "스킨", "로션", "크림", "립스틱", "마스크팩", "뷰티"]
+    recommended_concepts: [female_emotional, premium_luxury, instagram_aesthetic]
+    default_layout: center_product
+
+  general:
+    label: "일반"
+    keywords: []
+    recommended_concepts: [white_minimal, smartstore_emotional, coupang_sales]
+    default_layout: center_product

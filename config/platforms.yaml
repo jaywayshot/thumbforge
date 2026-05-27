@@ -1,0 +1,102 @@
+# ============================================================
+#  플랫폼별 정책 - 사이즈/금지문구/권장사항
+#  ── 정책 변경은 이 파일만 수정
+# ============================================================
+
+platforms:
+
+  coupang:
+    label: "쿠팡"
+    sizes:
+      thumbnail: [1000, 1000]
+      detail: [780, 780]
+    max_file_kb: 500
+    forbidden_words:
+      - "최저가"          # 객관적 입증 불가
+      - "100%"
+      - "완벽"
+      - "절대"
+      - "공식"            # 무단 사용 금지
+      - "정품보장"
+      - "유일"
+      - "최고"
+      - "1위"             # 근거 없으면 금지
+    text_warning_words:
+      - "무료배송"        # 실제 무료배송일 때만
+      - "당일출고"
+      - "오늘출발"
+    recommended_text_ratio: 0.25   # 이미지 대비 텍스트 면적
+
+  smartstore:
+    label: "스마트스토어"
+    sizes:
+      thumbnail: [1000, 1000]
+      detail: [860, 860]
+    max_file_kb: 2000
+    forbidden_words:
+      - "최저가"
+      - "100%"
+      - "공식인증"
+      - "유일"
+      - "특허"            # 보유시만
+      - "수상"
+    text_warning_words:
+      - "무료배송"
+      - "당일출고"
+    recommended_text_ratio: 0.20
+
+  eleven_st:
+    label: "11번가"
+    sizes:
+      thumbnail: [600, 600]
+    max_file_kb: 500
+    forbidden_words: ["최저가", "100%", "공식"]
+    recommended_text_ratio: 0.25
+
+  gmarket:
+    label: "지마켓"
+    sizes:
+      thumbnail: [600, 600]
+    max_file_kb: 500
+    forbidden_words: ["최저가", "100%"]
+    recommended_text_ratio: 0.25
+
+  auction:
+    label: "옥션"
+    sizes:
+      thumbnail: [600, 600]
+    max_file_kb: 500
+    forbidden_words: ["최저가", "100%"]
+    recommended_text_ratio: 0.25
+
+  aliexpress:
+    label: "알리익스프레스"
+    sizes:
+      thumbnail: [800, 800]
+    max_file_kb: 1000
+    forbidden_words: []        # 글로벌은 별도 정책
+    recommended_text_ratio: 0.30
+
+  amazon:
+    label: "아마존"
+    sizes:
+      thumbnail: [1000, 1000]
+      detail: [2000, 2000]
+    max_file_kb: 10000
+    forbidden_words:
+      - "Best"                 # 메인 이미지에 텍스트 자체 금지
+      - "Sale"
+      - "Free Shipping"
+      - "100%"
+    recommended_text_ratio: 0.0   # 아마존 메인은 텍스트 금지
+    notes:
+      - "메인 이미지는 흰배경 + 제품만 (RGB 255,255,255)"
+      - "텍스트/배지/로고 추가 금지"
+
+  own_mall:
+    label: "자사몰"
+    sizes:
+      thumbnail: [1200, 1200]
+    max_file_kb: 5000
+    forbidden_words: []
+    recommended_text_ratio: 0.35

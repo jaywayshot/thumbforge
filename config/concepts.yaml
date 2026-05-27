@@ -1,0 +1,273 @@
+# ============================================================
+#  컨셉 프리셋 - 썸네일 스타일별 디자인 토큰
+#  ── 색상/배경/문구톤/레이아웃을 분리해 하드코딩 제거
+#  ── 새로운 컨셉 추가는 이 파일만 수정하면 됨
+# ============================================================
+
+concepts:
+
+  coupang_sales:
+    label: "쿠팡 판매형"
+    description: "노란/빨간 강조, 큰 할인 문구, 시선 즉시 집중"
+    background:
+      type: gradient
+      colors: ["#FFFFFF", "#FFF6E5"]
+      angle: 135
+    accent_color: "#FF3B30"
+    sub_color: "#FFCC00"
+    text_color: "#1A1A1A"
+    layout: left_product_right_text
+    badge_style: bold_korean
+    headline_max: 12
+    prompt_keywords: "clean white studio, soft shadow, e-commerce product photo, top-seller style"
+
+  smartstore_emotional:
+    label: "스마트스토어 감성형"
+    description: "파스텔톤, 자연광, 부드러운 그림자"
+    background:
+      type: gradient
+      colors: ["#FAF6F0", "#EFE5D9"]
+      angle: 180
+    accent_color: "#8B7355"
+    sub_color: "#C9A77D"
+    text_color: "#3A2E25"
+    layout: center_product
+    badge_style: thin_serif
+    headline_max: 14
+    prompt_keywords: "natural sunlight, warm beige tones, lifestyle photography, soft bokeh"
+
+  premium_luxury:
+    label: "프리미엄 고급형"
+    description: "어두운 배경, 골드 포인트, 미니멀 타이포"
+    background:
+      type: solid
+      colors: ["#1A1A1A"]
+    accent_color: "#D4AF37"
+    sub_color: "#FFFFFF"
+    text_color: "#FFFFFF"
+    layout: center_product
+    badge_style: gold_serif
+    headline_max: 10
+    prompt_keywords: "luxury dark background, gold accents, premium product shot, marble surface, spotlight"
+
+  black_luxury:
+    label: "블랙 럭셔리형"
+    description: "딥블랙 + 메탈릭"
+    background:
+      type: gradient
+      colors: ["#000000", "#1A1A1A"]
+      angle: 135
+    accent_color: "#C0C0C0"
+    sub_color: "#FFFFFF"
+    text_color: "#FFFFFF"
+    layout: center_product
+    badge_style: metallic
+    headline_max: 10
+    prompt_keywords: "deep black background, metallic reflection, luxury studio, dramatic lighting"
+
+  white_minimal:
+    label: "화이트 미니멀형"
+    description: "여백 위주, 깨끗한 흰배경, 얇은 폰트"
+    background:
+      type: solid
+      colors: ["#FFFFFF"]
+    accent_color: "#000000"
+    sub_color: "#888888"
+    text_color: "#000000"
+    layout: center_product
+    badge_style: thin_modern
+    headline_max: 14
+    prompt_keywords: "pure white background, minimal, lots of white space, scandinavian style"
+
+  tech_electronics:
+    label: "테크 전자제품형"
+    description: "사이버/네온/그라데이션"
+    background:
+      type: gradient
+      colors: ["#0A0E27", "#1B2845", "#2E4374"]
+      angle: 135
+    accent_color: "#00E5FF"
+    sub_color: "#FF00C8"
+    text_color: "#FFFFFF"
+    layout: left_product_right_text
+    badge_style: futuristic
+    headline_max: 12
+    prompt_keywords: "futuristic tech background, neon cyan and magenta glow, gradient mesh, holographic"
+
+  health_food:
+    label: "건강식품 광고형"
+    description: "그린/내추럴/자연광"
+    background:
+      type: gradient
+      colors: ["#F0F7E8", "#D4E8C4"]
+      angle: 180
+    accent_color: "#4A7C3A"
+    sub_color: "#E8B547"
+    text_color: "#1F3A1F"
+    layout: center_product_top_text
+    badge_style: bold_korean
+    headline_max: 14
+    prompt_keywords: "natural green background, healthy lifestyle, fresh herbs, sunlight through leaves"
+
+  female_emotional:
+    label: "여성 감성형"
+    description: "핑크/베이지/로즈골드"
+    background:
+      type: gradient
+      colors: ["#FFE8E8", "#FFD4D4"]
+      angle: 135
+    accent_color: "#D87093"
+    sub_color: "#B76E79"
+    text_color: "#4A2C3A"
+    layout: center_product
+    badge_style: thin_serif
+    headline_max: 12
+    prompt_keywords: "soft pink background, rose gold accents, feminine aesthetic, floral details"
+
+  instagram_aesthetic:
+    label: "인스타 감성형"
+    description: "모카무스/뉴트럴/필름톤"
+    background:
+      type: gradient
+      colors: ["#E8DCC4", "#C9B79C"]
+      angle: 135
+    accent_color: "#6B4F3A"
+    sub_color: "#8C6E54"
+    text_color: "#3D2817"
+    layout: center_product
+    badge_style: thin_modern
+    headline_max: 10
+    prompt_keywords: "instagram aesthetic, mocha mousse, film tone, lifestyle, moody"
+
+  discount_event:
+    label: "할인행사형"
+    description: "강렬한 빨강/노랑, 거대한 할인 문구"
+    background:
+      type: diagonal_split
+      colors: ["#FFE600", "#FF3B30"]
+      angle: 135
+    accent_color: "#FFFFFF"
+    sub_color: "#1A1A1A"
+    text_color: "#1A1A1A"
+    layout: huge_text_top
+    badge_style: explosion
+    headline_max: 8
+    prompt_keywords: "sale banner background, red yellow burst, shopping event, promotional"
+
+  seasonal_event:
+    label: "시즌 이벤트형"
+    description: "시즌별 자동 변경"
+    background:
+      type: gradient
+      colors: ["#FFE5D9", "#FFB088"]
+      angle: 135
+    accent_color: "#D9534F"
+    sub_color: "#F0AD4E"
+    text_color: "#2C2C2C"
+    layout: center_product_top_text
+    badge_style: bold_korean
+    headline_max: 12
+    prompt_keywords: "seasonal background, festive, warm tones, celebration"
+
+  summer:
+    label: "여름 시즌형"
+    description: "시원한 블루/파스텔"
+    background:
+      type: gradient
+      colors: ["#A8E8F8", "#5DADE2"]
+      angle: 180
+    accent_color: "#FF6B6B"
+    sub_color: "#FFFFFF"
+    text_color: "#1A3A4A"
+    layout: center_product
+    badge_style: bold_korean
+    headline_max: 10
+    prompt_keywords: "fresh summer beach background, cool blue tones, water droplets, sunny"
+
+  winter:
+    label: "겨울 시즌형"
+    description: "차분한 화이트/네이비"
+    background:
+      type: gradient
+      colors: ["#E8F0F8", "#B8C9D9"]
+      angle: 180
+    accent_color: "#C0392B"
+    sub_color: "#2C3E50"
+    text_color: "#1A2530"
+    layout: center_product
+    badge_style: thin_serif
+    headline_max: 10
+    prompt_keywords: "winter background, snow texture, cozy, soft lighting"
+
+  kids:
+    label: "키즈 제품형"
+    description: "밝은 원색, 둥근 텍스트, 캐릭터 톤"
+    background:
+      type: gradient
+      colors: ["#FFE066", "#FFB347"]
+      angle: 135
+    accent_color: "#FF6B9D"
+    sub_color: "#5DADE2"
+    text_color: "#2E4A6B"
+    layout: center_product
+    badge_style: rounded_playful
+    headline_max: 12
+    prompt_keywords: "colorful playful background, rainbow, kid-friendly, cute"
+
+  sports:
+    label: "스포츠형"
+    description: "역동적 / 다이내믹 / 강한 대비"
+    background:
+      type: gradient
+      colors: ["#1A1A1A", "#FF6B00"]
+      angle: 45
+    accent_color: "#FF6B00"
+    sub_color: "#FFFFFF"
+    text_color: "#FFFFFF"
+    layout: diagonal
+    badge_style: bold_italic
+    headline_max: 10
+    prompt_keywords: "dynamic sports background, motion blur, energetic, athletic"
+
+  brand_shop:
+    label: "브랜드몰형"
+    description: "고급 / 균형 / 브랜드 컬러 위주"
+    background:
+      type: solid
+      colors: ["#F5F5F5"]
+    accent_color: "#000000"
+    sub_color: "#666666"
+    text_color: "#1A1A1A"
+    layout: center_product
+    badge_style: thin_modern
+    headline_max: 12
+    prompt_keywords: "premium brand shop background, balanced composition, refined"
+
+  homeshopping:
+    label: "홈쇼핑형"
+    description: "거대 가격 / 한정수량 / 강조"
+    background:
+      type: diagonal_split
+      colors: ["#FFFFFF", "#FFE600"]
+      angle: 135
+    accent_color: "#E60000"
+    sub_color: "#000000"
+    text_color: "#1A1A1A"
+    layout: huge_text_top
+    badge_style: explosion
+    headline_max: 10
+    prompt_keywords: "home shopping tv style background, limited time, urgent"
+
+  apple_style:
+    label: "애플 스타일형"
+    description: "큰 여백, 큰 제품, 얇은 타이포"
+    background:
+      type: solid
+      colors: ["#FFFFFF"]
+    accent_color: "#1D1D1F"
+    sub_color: "#86868B"
+    text_color: "#1D1D1F"
+    layout: huge_center_product
+    badge_style: thin_modern
+    headline_max: 10
+    prompt_keywords: "apple style minimal, pure white, large product, ultra thin typography"

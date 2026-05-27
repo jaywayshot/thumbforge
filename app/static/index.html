@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ThumbForge · AI 쇼핑몰 썸네일 생성기</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #14171f;
+    --panel-2: #1c2030;
+    --border: #2a2f42;
+    --text: #e6e9f2;
+    --muted: #8a92a8;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+                 "Malgun Gothic", "Noto Sans KR", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  header {
+    padding: 20px 32px; border-bottom: 1px solid var(--border); background: var(--panel);
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: -0.5px; }
+  header .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+         color: var(--muted); border: 1px solid transparent; }
+  .tab.active { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+  .tab:hover:not(.active) { color: var(--text); }
+  main { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .single-grid { display: grid; grid-template-columns: 360px 1fr; gap: 24px; }
+  @media (max-width: 900px) { .single-grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .panel h2 { margin: 0 0 14px; font-size: 13px; color: var(--muted);
+              text-transform: uppercase; letter-spacing: 1px; }
+  .drop { border: 2px dashed var(--border); border-radius: 12px;
+          padding: 32px 16px; text-align: center; color: var(--muted);
+          cursor: pointer; transition: 0.2s; margin-bottom: 16px; }
+  .drop.hover { border-color: var(--accent); background: rgba(99,102,241,0.05); color: var(--text); }
+  .drop input { display: none; }
+  .drop .ico { font-size: 28px; margin-bottom: 6px; }
+  .preview {
+    width: 100%; aspect-ratio: 1; border-radius: 10px; background: var(--panel-2);
+    background-size: 16px 16px;
+    background-image: linear-gradient(45deg, #20243a 25%, transparent 25%, transparent 75%, #20243a 75%, #20243a),
+                      linear-gradient(45deg, #20243a 25%, transparent 25%, transparent 75%, #20243a 75%, #20243a);
+    background-position: 0 0, 8px 8px;
+    display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 12px;
+  }
+  .preview img { max-width: 100%; max-height: 100%; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
+  select, input[type="text"], input[type="number"], input[type="color"] {
+    width: 100%; padding: 10px 12px;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--accent); }
+  input[type="color"] { height: 40px; padding: 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button.primary, button.secondary {
+    width: 100%; margin-top: 18px; padding: 14px;
+    border: 0; border-radius: 10px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: 0.15s;
+  }
+  button.primary { background: var(--accent); color: white; }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); }
+  .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: 99px;
+         background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+  .tag.warn { color: var(--warning); border-color: var(--warning); }
+  .results-empty { color: var(--muted); text-align: center; padding: 60px 20px; }
+  .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+          overflow: hidden; transition: 0.2s; }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-img {
+    aspect-ratio: 1; background:#000;
+    background-size: 16px 16px;
+    background-image: linear-gradient(45deg, #20243a 25%, transparent 25%, transparent 75%, #20243a 75%, #20243a),
+                      linear-gradient(45deg, #20243a 25%, transparent 25%, transparent 75%, #20243a 75%, #20243a);
+    background-position: 0 0, 8px 8px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card-img img { max-width: 100%; max-height: 100%; }
+  .card-body { padding: 12px; }
+  .card-meta { display:flex; justify-content:space-between; align-items:center; font-size: 12px; color: var(--muted); }
+  .ctr { padding: 3px 8px; border-radius: 99px; font-weight: 600;
+         background: var(--success); color: white; font-size: 11px; }
+  .ctr.mid { background: var(--warning); }
+  .ctr.low { background: var(--danger); }
+  .card a.dl { display:block; margin-top: 8px; text-align: center; padding: 8px;
+               background: var(--panel); color: var(--text); border-radius: 6px;
+               text-decoration: none; font-size: 13px; border: 1px solid var(--border); }
+  .card a.dl:hover { border-color: var(--accent); }
+  .notes { font-size: 11px; color: var(--warning); margin-top: 6px; }
+  .loader { width: 36px; height: 36px;
+            border: 3px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress { color: var(--muted); font-size: 13px; text-align: center; }
+  .err { color: var(--danger); padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; font-size: 13px; }
+  .progress-bar { width: 100%; height: 8px; background: var(--panel-2);
+                  border-radius: 99px; overflow: hidden; margin-top: 12px; }
+  .progress-bar > div { height: 100%; background: var(--accent); transition: width 0.3s; }
+  .brand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .brand-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .brand-card h3 { margin: 0 0 10px; font-size: 16px; }
+  .brand-card .swatch { display:inline-block; width:16px; height:16px; border-radius: 3px;
+                        margin-right: 4px; vertical-align: middle; border: 1px solid var(--border); }
+  .brand-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .brand-card-actions button { padding: 6px 10px; font-size: 12px; margin: 0; flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🎨 ThumbForge</h1>
+    <div class="sub">AI 쇼핑몰 썸네일 생성 SaaS · MVP</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-view="single">단일 생성</div>
+    <div class="tab" data-view="bulk">대량 처리</div>
+    <div class="tab" data-view="brand">브랜드 관리</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- 단일 생성 -->
+  <div id="view-single" class="view active">
+    <div class="single-grid">
+      <div class="panel">
+        <h2>1. 제품 업로드</h2>
+        <div id="drop" class="drop">
+          <div class="ico">📤</div>
+          <div>이미지를 끌어다 놓거나<br/>클릭해서 선택</div>
+          <input id="file" type="file" accept="image/*" />
+        </div>
+        <div id="preview" class="preview">
+          <span style="color:var(--muted); font-size:12px;">미리보기</span>
+        </div>
+        <div id="uploadMeta" class="badges"></div>
+
+        <h2 style="margin-top:24px;">2. 옵션</h2>
+        <label>컨셉</label>
+        <select id="concept"></select>
+        <label>플랫폼</label>
+        <select id="platform"></select>
+        <label>브랜드 (선택)</label>
+        <select id="brand"><option value="">없음</option></select>
+
+        <div class="row">
+          <div>
+            <label>생성 개수</label>
+            <input id="variants" type="number" min="1" max="8" value="4" />
+          </div>
+          <div>
+            <label>할인 %</label>
+            <input id="discount" type="number" min="0" max="99" placeholder="없음" />
+          </div>
+        </div>
+
+        <label>헤드라인 (비우면 AI 추천)</label>
+        <input id="headline" type="text" placeholder="예: 오늘의 베스트" />
+        <label>서브 텍스트</label>
+        <input id="sub" type="text" placeholder="예: 무료배송 · 당일출고" />
+        <label>뱃지</label>
+        <input id="badge" type="text" placeholder="예: BEST" />
+
+        <button id="genBtn" class="primary" disabled>썸네일 생성하기</button>
+      </div>
+
+      <div class="panel">
+        <h2>3. 생성 결과</h2>
+        <div id="results">
+          <div class="results-empty">
+            좌측에서 이미지를 업로드하고 컨셉을 선택한 뒤<br/>
+            <strong>썸네일 생성하기</strong> 버튼을 눌러주세요.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 대량 처리 -->
+  <div id="view-bulk" class="view">
+    <div class="panel" style="max-width: 720px; margin: 0 auto;">
+      <h2>ZIP 일괄 처리</h2>
+      <p style="color:var(--muted); font-size: 13px; margin: 0 0 16px;">
+        여러 제품 이미지를 <code>.zip</code>으로 묶어 올리면, 각각 N개 variant를 자동 생성해 하나의 ZIP으로 묶어드립니다.
+      </p>
+
+      <div id="dropZip" class="drop">
+        <div class="ico">📦</div>
+        <div id="dropZipLabel">ZIP 파일을 끌어다 놓거나 클릭해서 선택</div>
+        <input id="fileZip" type="file" accept=".zip" />
+      </div>
+
+      <div class="row">
+        <div><label>컨셉</label><select id="bulkConcept"></select></div>
+        <div><label>플랫폼</label><select id="bulkPlatform"></select></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>이미지당 variant 개수</label>
+          <input id="bulkVariants" type="number" min="1" max="6" value="3" />
+        </div>
+        <div>
+          <label>브랜드 (선택)</label>
+          <select id="bulkBrand"><option value="">없음</option></select>
+        </div>
+      </div>
+      <label>공통 헤드라인 (비우면 자동 추천)</label>
+      <input id="bulkHeadline" type="text" placeholder="예: 오늘의 추천" />
+
+      <button id="bulkBtn" class="primary" disabled>대량 생성 시작</button>
+      <div id="bulkStatus" style="margin-top: 20px;"></div>
+    </div>
+  </div>
+
+  <!-- 브랜드 -->
+  <div id="view-brand" class="view">
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+        <h2 style="margin: 0;">내 브랜드</h2>
+        <button id="newBrandBtn" class="secondary" style="width:auto; margin: 0; padding: 8px 16px;">+ 새 브랜드</button>
+      </div>
+      <div id="brandList" class="brand-grid"></div>
+    </div>
+
+    <div id="brandEditor" class="panel" style="display:none; margin-top: 16px;">
+      <h2>브랜드 편집</h2>
+      <input type="hidden" id="brandId" />
+      <label>이름</label>
+      <input id="brandName" type="text" />
+      <div class="row">
+        <div><label>액센트 컬러</label><input id="brandAccent" type="color" value="#6366f1" /></div>
+        <div><label>서브 컬러</label><input id="brandSub" type="color" value="#888888" /></div>
+      </div>
+      <label>텍스트 컬러</label>
+      <input id="brandText" type="color" value="#1a1a1a" />
+      <label>기본 헤드라인</label>
+      <input id="brandHeadline" type="text" />
+      <label>기본 서브</label>
+      <input id="brandSubText" type="text" />
+      <label>기본 뱃지</label>
+      <input id="brandBadge" type="text" />
+      <label>로고 (PNG 권장, 5MB 이하)</label>
+      <input id="brandLogo" type="file" accept="image/*" />
+      <label>폰트 (.ttf / .otf, 20MB 이하)</label>
+      <input id="brandFont" type="file" accept=".ttf,.otf,.ttc" />
+      <label>브랜드 금지문구 (콤마 구분)</label>
+      <input id="brandForbidden" type="text" placeholder="예: 카피브랜드, 짝퉁" />
+      <div class="row">
+        <button id="saveBrand" class="primary">저장</button>
+        <button id="deleteBrand" class="secondary" style="background:rgba(239,68,68,0.1); color:var(--danger); border-color:var(--danger);">삭제</button>
+      </div>
+      <div id="brandMsg" style="margin-top:8px; font-size: 13px;"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API = "";
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+$$(".tab").forEach(t => t.addEventListener("click", () => {
+  $$(".tab").forEach(x => x.classList.remove("active"));
+  $$(".view").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  $("#view-" + t.dataset.view).classList.add("active");
+  if (t.dataset.view === "brand") loadBrandList();
+}));
+
+let CONCEPTS = {}, PLATFORMS = {}, BRANDS = [];
+
+async function loadOptions() {
+  try {
+    const [c, p, b] = await Promise.all([
+      fetch(API + "/api/concepts").then(r => r.json()),
+      fetch(API + "/api/platforms").then(r => r.json()),
+      fetch(API + "/api/brands").then(r => r.json()),
+    ]);
+    CONCEPTS = c; PLATFORMS = p; BRANDS = b;
+    const conceptOpts = Object.entries(c).map(
+      ([k, v]) => `<option value="${k}" title="${v.description}">${v.label}</option>`
+    ).join("");
+    const platformOpts = Object.entries(p).map(
+      ([k, v]) => `<option value="${k}">${v.label}</option>`
+    ).join("");
+    const brandOpts = `<option value="">없음</option>` + b.map(
+      x => `<option value="${x.brand_id}">${x.name}</option>`
+    ).join("");
+
+    $("#concept").innerHTML = conceptOpts;
+    $("#platform").innerHTML = platformOpts;
+    $("#brand").innerHTML = brandOpts;
+    $("#bulkConcept").innerHTML = conceptOpts;
+    $("#bulkPlatform").innerHTML = platformOpts;
+    $("#bulkBrand").innerHTML = brandOpts;
+  } catch (e) { console.error(e); }
+}
+loadOptions();
+
+/* 단일 */
+const drop = $("#drop"), fileInput = $("#file"), preview = $("#preview");
+const genBtn = $("#genBtn"), results = $("#results"), uploadMeta = $("#uploadMeta");
+let currentUpload = null;
+
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("hover"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("hover"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("hover");
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+
+async function handleFile(file) {
+  preview.innerHTML = `<img src="${URL.createObjectURL(file)}" />`;
+  uploadMeta.innerHTML = `<span class="tag">⏳ 업로드 중...</span>`;
+  genBtn.disabled = true;
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const res = await fetch(API + "/api/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    currentUpload = data.upload_id;
+    uploadMeta.innerHTML = `
+      <span class="tag">${data.width}×${data.height}</span>
+      <span class="tag">${data.has_alpha ? "투명 PNG" : "JPG/배경 있음"}</span>
+      <span class="tag">카테고리: ${data.detected_category}</span>
+      ${(data.quality_warnings || []).map(w => `<span class="tag warn">⚠ ${w}</span>`).join("")}
+    `;
+    if (data.suggested_concepts && data.suggested_concepts.length) {
+      $("#concept").value = data.suggested_concepts[0];
+    }
+    genBtn.disabled = false;
+  } catch (e) {
+    uploadMeta.innerHTML = `<span class="tag warn">업로드 실패: ${e.message}</span>`;
+  }
+}
+
+genBtn.addEventListener("click", async () => {
+  if (!currentUpload) return;
+  genBtn.disabled = true;
+  results.innerHTML = `<div class="loader"></div><div class="progress">생성 중... (첫 실행 시 1~2분)</div>`;
+  const body = {
+    upload_id: currentUpload,
+    concept: $("#concept").value,
+    platform: $("#platform").value,
+    variants: parseInt($("#variants").value) || 4,
+    brand_id: $("#brand").value || null,
+    text: {
+      headline: $("#headline").value || null,
+      sub_text: $("#sub").value || null,
+      badge: $("#badge").value || null,
+      discount_percent: parseInt($("#discount").value) || null,
+    },
+  };
+  try {
+    const res = await fetch(API + "/api/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || res.statusText); }
+    renderResults(await res.json());
+  } catch (e) {
+    results.innerHTML = `<div class="err">생성 실패: ${e.message}</div>`;
+  } finally { genBtn.disabled = false; }
+});
+
+function renderResults(data) {
+  const grid = data.variants.map(v => {
+    const cls = v.ctr_score >= 75 ? "" : v.ctr_score >= 55 ? "mid" : "low";
+    const notes = v.qc_notes && v.qc_notes.length
+      ? `<div class="notes">⚠ ${v.qc_notes.join(" · ")}</div>` : "";
+    return `
+      <div class="card">
+        <div class="card-img"><img src="${API}${v.file_url}" /></div>
+        <div class="card-body">
+          <div class="card-meta">
+            <span>${v.variant_id} · ${v.layout_used}</span>
+            <span class="ctr ${cls}">CTR ${v.ctr_score}</span>
+          </div>
+          ${notes}
+          <a class="dl" href="${API}${v.file_url}" download="${v.variant_id}.png">⬇ 다운로드</a>
+        </div>
+      </div>`;
+  }).join("");
+  results.innerHTML = `
+    <div style="color:var(--muted); font-size:13px; margin-bottom:12px;">
+      ${data.variants.length}개 · ${data.elapsed_ms}ms · ${data.concept} · ${data.platform}
+    </div>
+    <div class="results-grid">${grid}</div>`;
+}
+
+/* 대량 */
+const dropZip = $("#dropZip"), fileZip = $("#fileZip"), bulkBtn = $("#bulkBtn"), bulkStatus = $("#bulkStatus");
+let bulkFile = null;
+
+dropZip.addEventListener("click", () => fileZip.click());
+dropZip.addEventListener("dragover", e => { e.preventDefault(); dropZip.classList.add("hover"); });
+dropZip.addEventListener("dragleave", () => dropZip.classList.remove("hover"));
+dropZip.addEventListener("drop", e => {
+  e.preventDefault(); dropZip.classList.remove("hover");
+  if (e.dataTransfer.files.length) handleZip(e.dataTransfer.files[0]);
+});
+fileZip.addEventListener("change", () => fileZip.files.length && handleZip(fileZip.files[0]));
+
+function handleZip(f) {
+  bulkFile = f;
+  $("#dropZipLabel").textContent = f.name;
+  bulkBtn.disabled = false;
+}
+
+bulkBtn.addEventListener("click", async () => {
+  if (!bulkFile) return;
+  bulkBtn.disabled = true;
+  bulkStatus.innerHTML = `<div class="loader"></div><div class="progress">업로드 중...</div>`;
+  const fd = new FormData();
+  fd.append("file", bulkFile);
+  fd.append("concept", $("#bulkConcept").value);
+  fd.append("platform", $("#bulkPlatform").value);
+  fd.append("variants_per_image", $("#bulkVariants").value);
+  fd.append("text_json", JSON.stringify({ headline: $("#bulkHeadline").value || null }));
+  try {
+    const res = await fetch(API + "/api/bulk/upload", { method: "POST", body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const { job_id } = await res.json();
+    pollBulk(job_id);
+  } catch (e) {
+    bulkStatus.innerHTML = `<div class="err">${e.message}</div>`;
+    bulkBtn.disabled = false;
+  }
+});
+
+async function pollBulk(jobId) {
+  while (true) {
+    try {
+      const s = await (await fetch(API + `/api/bulk/status/${jobId}`)).json();
+      const pct = Math.round((s.progress || 0) * 100);
+      let extra = "";
+      if (s.status === "success") {
+        extra = `
+          <div style="margin-top:12px;">
+            <a class="dl" style="display:inline-block; padding: 10px 16px; background: var(--accent); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;"
+               href="${API}/api/bulk/result/${jobId}.zip">⬇ 결과 ZIP 다운로드</a>
+            <span style="margin-left: 12px; color: var(--muted);">
+              ${s.result.succeeded}/${s.result.total_images} 성공
+            </span>
+          </div>`;
+        bulkStatus.innerHTML = `
+          <div style="font-size: 13px; color: var(--muted);">${s.message || ''}</div>
+          <div class="progress-bar"><div style="width:100%;"></div></div>
+          <div style="text-align:right; font-size:12px; color: var(--muted); margin-top: 4px;">
+            ${s.done}/${s.total} · 100% · ${s.elapsed_sec}s
+          </div>${extra}`;
+        bulkBtn.disabled = false;
+        return;
+      } else if (s.status === "failed") {
+        bulkStatus.innerHTML = `<div class="err">실패: ${s.error}</div>`;
+        bulkBtn.disabled = false;
+        return;
+      }
+      bulkStatus.innerHTML = `
+        <div style="font-size: 13px; color: var(--muted);">${s.message || '대기 중...'}</div>
+        <div class="progress-bar"><div style="width:${pct}%;"></div></div>
+        <div style="text-align:right; font-size:12px; color: var(--muted); margin-top: 4px;">
+          ${s.done}/${s.total || '?'} · ${pct}% · ${s.elapsed_sec}s
+        </div>`;
+      await new Promise(r => setTimeout(r, 1500));
+    } catch (e) {
+      bulkStatus.innerHTML = `<div class="err">조회 실패: ${e.message}</div>`;
+      bulkBtn.disabled = false;
+      return;
+    }
+  }
+}
+
+/* 브랜드 */
+const brandList = $("#brandList"), brandEditor = $("#brandEditor");
+
+async function loadBrandList() {
+  BRANDS = await (await fetch(API + "/api/brands")).json();
+  if (!BRANDS.length) {
+    brandList.innerHTML = `<div class="results-empty">아직 등록된 브랜드가 없습니다.<br/>우상단 <strong>+ 새 브랜드</strong> 버튼을 눌러주세요.</div>`;
+    return;
+  }
+  brandList.innerHTML = BRANDS.map(b => `
+    <div class="brand-card">
+      <h3>${b.name}</h3>
+      <div style="font-size: 12px; color: var(--muted);">ID: ${b.brand_id}</div>
+      <div style="margin: 10px 0;">
+        ${b.accent_color ? `<span class="swatch" style="background:${b.accent_color}"></span>` : ''}
+        ${b.sub_color ? `<span class="swatch" style="background:${b.sub_color}"></span>` : ''}
+        ${b.text_color ? `<span class="swatch" style="background:${b.text_color}"></span>` : ''}
+      </div>
+      <div style="font-size: 12px;">${b.logo_filename ? '✓ 로고' : '○ 로고 없음'} · ${b.font_filename ? '✓ 폰트' : '○ 폰트 없음'}</div>
+      <div class="brand-card-actions">
+        <button class="secondary" onclick="editBrand('${b.brand_id}')">편집</button>
+      </div>
+    </div>`).join("");
+}
+
+$("#newBrandBtn").addEventListener("click", async () => {
+  const name = prompt("브랜드 이름:");
+  if (!name) return;
+  const res = await fetch(API + "/api/brands", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const b = await res.json();
+  loadBrandList();
+  editBrand(b.brand_id);
+});
+
+window.editBrand = async (id) => {
+  const b = await (await fetch(API + `/api/brands/${id}`)).json();
+  $("#brandId").value = b.brand_id;
+  $("#brandName").value = b.name || "";
+  $("#brandAccent").value = b.accent_color || "#6366f1";
+  $("#brandSub").value = b.sub_color || "#888888";
+  $("#brandText").value = b.text_color || "#1a1a1a";
+  $("#brandHeadline").value = b.default_headline || "";
+  $("#brandSubText").value = b.default_sub_text || "";
+  $("#brandBadge").value = b.default_badge || "";
+  $("#brandForbidden").value = (b.forbidden_words || []).join(", ");
+  brandEditor.style.display = "block";
+  $("#brandMsg").textContent = "";
+  brandEditor.scrollIntoView({ behavior: "smooth" });
+};
+
+$("#saveBrand").addEventListener("click", async () => {
+  const id = $("#brandId").value;
+  const body = {
+    name: $("#brandName").value,
+    accent_color: $("#brandAccent").value,
+    sub_color: $("#brandSub").value,
+    text_color: $("#brandText").value,
+    default_headline: $("#brandHeadline").value || null,
+    default_sub_text: $("#brandSubText").value || null,
+    default_badge: $("#brandBadge").value || null,
+    forbidden_words: $("#brandForbidden").value.split(",").map(s => s.trim()).filter(Boolean),
+  };
+  await fetch(API + `/api/brands/${id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if ($("#brandLogo").files.length) {
+    const fd = new FormData(); fd.append("file", $("#brandLogo").files[0]);
+    await fetch(API + `/api/brands/${id}/logo`, { method: "POST", body: fd });
+  }
+  if ($("#brandFont").files.length) {
+    const fd = new FormData(); fd.append("file", $("#brandFont").files[0]);
+    await fetch(API + `/api/brands/${id}/font`, { method: "POST", body: fd });
+  }
+  $("#brandMsg").innerHTML = '<span style="color: var(--success);">✓ 저장 완료</span>';
+  loadBrandList();
+  loadOptions();
+});
+
+$("#deleteBrand").addEventListener("click", async () => {
+  const id = $("#brandId").value;
+  if (!confirm("정말 삭제할까요?")) return;
+  await fetch(API + `/api/brands/${id}`, { method: "DELETE" });
+  brandEditor.style.display = "none";
+  loadBrandList();
+  loadOptions();
+});
+</script>
+</body>
+</html>
