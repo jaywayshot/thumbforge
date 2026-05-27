@@ -59,6 +59,17 @@ def fit_product_to_box(product_rgba: Image.Image, box: Box, max_ratio: float = 0
     return resized, (px, py)
 
 
+def _contrast_stroke(color_hex: str) -> str:
+    """글자색 밝기에 따라 대비되는 외곽선 색(어두운 글자→흰 외곽선, 밝은 글자→검정)."""
+    try:
+        h = color_hex.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        lum = 0.299 * r + 0.587 * g + 0.114 * b
+    except Exception:
+        lum = 128
+    return "#FFFFFF" if lum < 140 else "#000000"
+
+
 def _crop_to_alpha(product_rgba: Image.Image) -> Image.Image:
     if product_rgba.mode != "RGBA":
         product_rgba = product_rgba.convert("RGBA")
@@ -200,30 +211,27 @@ def compose_thumbnail(
     text_color = concept.get("text_color", "#1A1A1A")
     accent = concept.get("accent_color", "#FF3B30")
     sub_color = concept.get("sub_color", "#888888")
+    # scene(사진 배경) 위에선 외곽선/그림자를 강화해 가독성 확보
+    scene = placement is not None
 
     if headline:
         size = _fit_text_to_box(headline, layout.headline_box, bold=True, max_size=int(layout.headline_box.h * 0.85), font_path=bfp)
         font = get_font(size, bold=True, brand_font_path=bfp)
+        hw = max(2, size // 18) if scene else 0
         draw_text_with_shadow(
-            canvas,
-            headline,
-            (layout.headline_box.x, layout.headline_box.y),
-            font=font,
-            color=text_color,
-            shadow=True,
-            stroke_width=0,
+            canvas, headline, (layout.headline_box.x, layout.headline_box.y),
+            font=font, color=text_color, shadow=True,
+            stroke_width=hw, stroke_color=_contrast_stroke(text_color) if scene else None,
         )
 
     if sub_text:
         size = _fit_text_to_box(sub_text, layout.sub_box, bold=False, max_size=int(layout.sub_box.h * 0.85), font_path=bfp)
         font = get_font(size, bold=False, brand_font_path=bfp)
+        sw = max(1, size // 26) if scene else 0
         draw_text_with_shadow(
-            canvas,
-            sub_text,
-            (layout.sub_box.x, layout.sub_box.y),
-            font=font,
-            color=sub_color,
-            shadow=False,
+            canvas, sub_text, (layout.sub_box.x, layout.sub_box.y),
+            font=font, color=sub_color, shadow=scene,  # scene 이면 그림자 ON(가독성)
+            stroke_width=sw, stroke_color=_contrast_stroke(sub_color) if scene else None,
         )
 
     # 3. 뱃지
