@@ -234,6 +234,75 @@ pip install google-generativeai   # Gemini 쓸 때
 
 ---
 
+## 🧠 LLM 문구 추천 (OpenAI / Anthropic)
+
+업로드한 제품의 **카테고리 + 컨셉 + 플랫폼**에 맞는 매출형 문구(헤드라인/서브/뱃지)를
+실제 LLM 으로 생성합니다. 키가 없으면 자동으로 mock 폴백되어 **에러 없이** 동작합니다.
+
+### 환경변수
+
+```env
+# 문구 provider 선택: mock(기본) | openai | anthropic
+TEXT_PROVIDER=openai
+
+# OpenAI (기본 모델 gpt-4o-mini)
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini        # 선택, 미설정 시 gpt-4o-mini
+
+# Anthropic (기본 모델 claude-haiku-4-5)
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-haiku-4-5  # 선택
+```
+
+> 한 호출당 응답 토큰은 **max_tokens=300** 으로 고정(비용 폭주 방지).
+> 추가 패키지: `pip install openai` 또는 `pip install anthropic` (선택적 의존성).
+
+### 검증 레이어 (두 provider 공통 — `app/providers/llm_support.py`)
+
+- 출력은 JSON 강제(`{headline, sub_text, badge}`), 18개 컨셉별 **톤 가이드** + 플랫폼 **금지어**를 system 프롬프트에 주입
+- **JSON 파싱 실패** → mock 폴백
+- **필드 누락** → 누락 필드만 mock 으로 채움
+- **글자수 초과**(헤드라인 12 / 서브 16 / 뱃지 6자) → 잘라내기 + 경고 로깅
+- **금지어 포함** → 1회 재호출(regenerate), 그래도 포함이면 mock 폴백
+
+### 캐싱
+
+- 키: `(provider, model, category, concept, platform)` 해시
+- 파일: `workspace/temp/llm_cache.json`, **TTL 24시간**, **1MB 초과 시 오래된 항목부터 자동 삭제**
+- `/api/text/suggest` 요청에 `fresh=true` 를 주면 캐시를 무시하고 새로 생성
+
+### 사용량 추적
+
+- 호출마다 토큰 수·예상 비용을 로깅하고 `workspace/temp/llm_usage.jsonl` 에 한 줄씩 기록
+- 누적 통계: `GET /api/llm/usage` (총 호출/토큰/비용, 모델별 분해)
+
+### API / UI
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/text/suggest \
+  -H "Content-Type: application/json" \
+  -d '{"category":"electronics","concept":"tech_electronics","platform":"coupang"}'
+
+curl http://127.0.0.1:8000/api/llm/usage
+```
+
+브라우저 **단일 생성** 탭의 `✨ LLM 문구 생성` 버튼을 누르면 현재 카테고리/컨셉/플랫폼으로
+호출해 입력칸을 자동으로 채웁니다.
+
+### 품질 평가 도구 (수동 실행)
+
+8개 컨셉 × 4개 카테고리 = 32개 조합을 호출해 글자수 초과·금지어·카테고리 적합도를 표로 정리합니다.
+**캐시를 무시하고 호출**하며(정확한 측정), 결과는 `workspace/temp/llm_eval.md` 에 저장됩니다.
+
+```bash
+python scripts/eval_llm_quality.py --provider openai   # 실호출 → 비용 발생(실행 전 확인)
+python scripts/eval_llm_quality.py --provider mock     # 무료(로직 점검)
+```
+
+> ⚠ 실 provider 로 실행하면 32회 실호출 → 비용이 발생합니다. 스크립트가 실행 전 확인을 받습니다(`--yes` 로 생략).
+
+---
+
 ## 🎨 컨셉 추가/수정 (하드코딩 0)
 
 `config/concepts.yaml` 만 편집하면 새 컨셉이 즉시 UI에 노출됩니다.
@@ -391,7 +460,7 @@ sudo apt install fonts-nanum
 | v2 | **대량 ZIP 업로드 → 일괄 처리 → 결과 ZIP** (인메모리 job queue) | ✅ |
 | v2 | **브랜드 관리** (로고/컬러/폰트/기본문구/금지어) | ✅ |
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
-| 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | ✅ (TEXT_PROVIDER=openai/anthropic, 키 없으면 mock 폴백) |
+| 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 깊이 구현) | ✅ 검증레이어(누락/길이/금지어 재호출)·캐시(24h,1MB)·사용량(/api/llm/usage)·평가도구. 키 없으면 mock 폴백 (상단 "LLM 문구 추천" 절) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
 | 다음 | 경쟁사 URL 분석 (쿠팡/11번가/네이버 어댑터, 색감/뱃지 패턴 → 컨셉 추천) | ⚠️ 구현 완료·**실수집 보류**: 3사 모두 정적 HTML 차단(상단 "경쟁사 분석" 절 참고). 공식 API 경로 안내. 모킹 로직 검증 유지 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |

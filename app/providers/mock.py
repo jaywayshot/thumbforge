@@ -201,7 +201,17 @@ def _pick_safe(candidates: list[str], fallback: str) -> str:
 
 
 class MockTextSuggestionProvider(TextSuggestionProvider):
-    def suggest(self, category: str, concept: str, product_hint: Optional[str] = None) -> dict:
+    def suggest(
+        self,
+        category: str,
+        concept: str,
+        product_hint: Optional[str] = None,
+        platform: Optional[str] = None,
+        *,
+        fresh: bool = False,
+        use_cache: bool = False,
+    ) -> dict:
+        # mock 은 네트워크/비용이 없으므로 platform/fresh/use_cache 는 무시한다.
         headlines = _HEADLINE_BANK.get(category, _HEADLINE_BANK["general"])
         subs = _SUB_BANK.get(category, _SUB_BANK["general"])
         # 뱅크에 실수로 금지어가 섞여도 사후 필터로 걸러낸다

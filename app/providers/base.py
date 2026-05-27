@@ -29,8 +29,18 @@ class TextSuggestionProvider(ABC):
         category: str,
         concept: str,
         product_hint: Optional[str] = None,
+        platform: Optional[str] = None,
+        *,
+        fresh: bool = False,
+        use_cache: bool = False,
     ) -> dict:
-        """{headline, sub_text, badge} 반환"""
+        """{headline, sub_text, badge} 반환.
+
+        platform: 금지어/캐시 키에 사용(없으면 전 플랫폼 안전 모드).
+        fresh: 캐시를 읽지 않고 새로 생성(결과는 캐시에 저장).
+        use_cache: True 일 때만 캐시 읽기/쓰기(기본 False — 직접 호출은 결정적).
+                   API 라우트(/api/text/suggest)가 True 로 켠다. 평가 도구는 False.
+        """
         ...
 
 
