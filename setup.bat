@@ -36,7 +36,13 @@ echo.
 echo [2/3] pip 업그레이드 + 의존성 설치 중... (수 분 소요 가능)
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+
+REM Python 3.13+ 이면 휠 호환 lock 파일 자동 선택
+set REQ=requirements.txt
+for /f %%i in ('python -c "import sys;print('y' if sys.version_info[:2]>=(3,13) else 'n')"') do set NEWPY=%%i
+if "%NEWPY%"=="y" set REQ=requirements-py314.txt
+echo     의존성 파일: %REQ%
+python -m pip install -r %REQ%
 if errorlevel 1 (
     echo [X] 의존성 설치 실패
     pause

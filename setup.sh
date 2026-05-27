@@ -28,7 +28,14 @@ source .venv/bin/activate
 echo
 echo "[2/3] pip 업그레이드 + 의존성 설치 중..."
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+
+# Python 3.13+ 이면 휠 호환 lock 파일 자동 선택
+REQ=requirements.txt
+if python -c "import sys; sys.exit(0 if sys.version_info[:2] >= (3,13) else 1)"; then
+  REQ=requirements-py314.txt
+fi
+echo "    의존성 파일: $REQ"
+python -m pip install -r "$REQ"
 
 if [ ! -f ".env" ]; then
   echo

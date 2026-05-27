@@ -1,0 +1,36 @@
+# ============================================================
+#  Python 3.13 / 3.14 용 의존성 (사전 빌드 휠이 있는 최신 버전)
+#
+#  requirements.txt 의 핀(2024년 버전: numpy 1.26.4 등)은
+#  Python 3.13+ 용 휠이 없어 소스 빌드(C 컴파일러 필요)로 떨어져 실패한다.
+#  이 파일은 3.13/3.14 에서 휠로 바로 설치되는 버전으로 검증된 대안이다.
+#
+#  setup.bat / setup.sh 가 인터프리터 버전을 보고 3.13+ 면 이 파일을 자동 선택한다.
+#  (3.10~3.12 환경은 기존 requirements.txt 를 그대로 사용)
+# ============================================================
+
+# ===== Core API =====
+fastapi==0.136.3
+uvicorn[standard]==0.48.0
+python-multipart==0.0.29
+pydantic==2.13.4
+pydantic-settings==2.14.1
+
+# ===== Image Processing =====
+Pillow==12.2.0
+opencv-python-headless==4.13.0.92
+numpy==2.4.6
+
+# ===== AI Background Removal =====
+# rembg는 첫 실행 시 모델 자동 다운로드(~170MB)
+rembg==2.0.75
+onnxruntime==1.26.0
+
+# ===== Config / Utils =====
+PyYAML==6.0.3
+python-dotenv==1.2.2
+httpx==0.28.1
+aiofiles==25.1.0
+
+# ===== Dev =====
+pytest==9.0.3
