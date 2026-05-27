@@ -1,0 +1,56 @@
+# ============================================================
+#  카테고리 마스터 (v2) — 라이프스타일 신 생성용
+#  ── 기존 categories.yaml(파일명 키워드 추정용)은 그대로 보존
+#  ── 여기 키는 ProductInfo.category 값(한글)과 1:1 대응
+#  ── 각 카테고리: 하위 분류 + 권장 무드 + 적합 사용공간 + 영문 신 키워드
+# ============================================================
+
+categories:
+
+  가구:
+    sub_categories: ["소파", "의자", "테이블", "책상", "침대", "책장", "옷장", "수납장", "조명", "기타"]
+    mood_keywords: ["미니멀", "북유럽", "내추럴", "모던", "우드톤"]
+    use_spaces: ["거실", "침실", "서재", "주방", "사무실"]
+    scene_keywords: "spacious minimal interior, wooden flooring, soft natural daylight from large window"
+
+  의류:
+    sub_categories: ["상의", "하의", "원피스", "코트", "아우터", "니트", "신발", "기타"]
+    mood_keywords: ["감성", "데일리", "시크", "캐주얼", "스칸디나비안"]
+    use_spaces: ["공용", "거실"]
+    scene_keywords: "minimal clothing rack, white walls with line art posters, wooden floor, scandinavian style"
+
+  식품:
+    sub_categories: ["가공식품", "신선식품", "건강식품", "음료", "간식", "조미료", "기타"]
+    mood_keywords: ["내추럴", "건강", "신선", "따뜻한", "정갈한"]
+    use_spaces: ["주방", "공용"]
+    scene_keywords: "clean kitchen counter with marble surface, soft window light, natural ingredients in background"
+
+  전자제품:
+    sub_categories: ["이어폰", "헤드폰", "키보드", "마우스", "노트북", "모니터", "스마트워치", "충전기", "기타"]
+    mood_keywords: ["테크", "모던", "미니멀", "프로페셔널", "클린"]
+    use_spaces: ["사무실", "서재", "거실"]
+    scene_keywords: "minimal modern desk setup, white wall background, soft directional lighting, professional product environment"
+
+  뷰티:
+    sub_categories: ["스킨케어", "메이크업", "헤어", "바디", "향수", "마스크팩", "기타"]
+    mood_keywords: ["감성", "클린", "로즈", "내추럴", "럭셔리"]
+    use_spaces: ["욕실", "침실", "공용"]
+    scene_keywords: "clean cosmetics shelf with marble background, soft pink and beige tones, delicate flowers"
+
+  생활용품:
+    sub_categories: ["주방용품", "욕실용품", "청소용품", "수납정리", "침구", "기타"]
+    mood_keywords: ["미니멀", "깔끔한", "내추럴", "모던", "실용적"]
+    use_spaces: ["주방", "욕실", "거실", "공용"]
+    scene_keywords: "minimal home setting, soft natural lighting, clean modern interior"
+
+  액세서리:
+    sub_categories: ["주얼리", "시계", "가방", "지갑", "모자", "벨트", "기타"]
+    mood_keywords: ["럭셔리", "미니멀", "프리미엄", "시크", "감성"]
+    use_spaces: ["공용"]
+    scene_keywords: "minimal display surface with neutral fabric, premium showcase environment, soft lighting"
+
+  기타:
+    sub_categories: ["기타"]
+    mood_keywords: ["미니멀", "클린", "모던"]
+    use_spaces: ["공용", "거실"]
+    scene_keywords: "minimal clean studio environment, soft natural lighting, neutral background"
