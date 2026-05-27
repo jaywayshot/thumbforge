@@ -197,6 +197,53 @@ my_brand_dark:
 
 ---
 
+## ⚙️ Celery + Redis 전환 방법
+
+기본값은 **단일 프로세스 스레드풀**입니다. 별도 설치 없이 대량 처리가 그대로 동작합니다.
+트래픽이 늘어 워커를 분리하고 싶을 때만 아래처럼 Celery로 전환합니다. **코드 변경은 필요 없습니다.**
+
+### 동작 방식
+- 대량 처리 디스패치는 `app/jobs/celery_app.py` 의 `dispatch_bulk_job()` 한 곳을 거칩니다.
+- `USE_CELERY=true` + `celery` 설치 + Redis 가동 → **Celery 큐**로 처리
+- 그 외(기본) → 기존 **스레드풀**(`registry.run_in_background`)로 처리
+- 작업 진행률 추적용 `app/jobs/registry.py` 인터페이스는 **그대로** 유지됩니다.
+
+### 전환 절차
+
+1. Redis + 워커 컨테이너 기동 (정의는 `docker-compose.yml` 에 있음):
+
+   ```bash
+   docker compose up -d redis worker
+   ```
+
+   > 워커 컨테이너는 기동 시 `requirements.txt` + `celery[redis]` 를 설치하고
+   > `celery -A app.jobs.celery_app:celery_app worker` 를 실행합니다.
+
+2. 앱(FastAPI)을 Celery 모드로 실행 — 환경변수만 추가:
+
+   ```bash
+   # .env 에 추가하거나 실행 시 주입
+   USE_CELERY=true
+   REDIS_URL=redis://localhost:6379/0
+   ```
+
+   ```bash
+   uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+
+3. 로컬에서 Docker 없이 직접 워커를 띄우려면:
+
+   ```bash
+   pip install "celery[redis]"
+   celery -A app.jobs.celery_app:celery_app worker --loglevel=info
+   ```
+
+### 되돌리기
+`USE_CELERY` 를 지우거나 `false` 로 두면 즉시 스레드풀 모드로 복귀합니다.
+`celery` 패키지가 없어도 앱 import/실행은 깨지지 않습니다(선택적 의존성).
+
+---
+
 ## 📁 폴더 구조
 
 ```
@@ -223,7 +270,8 @@ THUMBNAIL_SAAS/
 │   │   └── pipeline.py      # 메인 파이프라인 (브랜드 적용 포함, v2)
 │   ├── jobs/                # 백그라운드 작업 (v2)
 │   │   ├── registry.py      # 인메모리 job 추적 (→ Celery 교체 가능)
-│   │   └── bulk_worker.py   # ZIP 일괄 처리 워커
+│   │   ├── bulk_worker.py   # ZIP 일괄 처리 워커
+│   │   └── celery_app.py    # Celery 인스턴스 + 디스패처 (USE_CELERY 시)
 │   ├── providers/           # AI Provider (어댑터 패턴)
 │   │   ├── base.py
 │   │   ├── mock.py          # ★기본
@@ -279,7 +327,7 @@ sudo apt install fonts-nanum
 | v2 | **브랜드 관리** (로고/컬러/폰트/기본문구/금지어) | ✅ |
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
 | 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | 🔜 인터페이스만 |
-| 다음 | Celery + Redis 전환 (현재는 단일 프로세스 스레드풀) | 🔜 |
+| 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
 | 다음 | 경쟁사 URL 분석 (쿠팡 상위 썸네일 색감/문구 패턴) | 🔜 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
 | 확장 | 유튜브 썸네일 / 쇼츠·릴스 / 광고 소재 / 상세페이지 자동 생성 | 🔜 |

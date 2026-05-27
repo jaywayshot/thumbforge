@@ -1,0 +1,66 @@
+# ============================================================
+#  Celery 전환용 구성 (선택 사항 — 기본 실행에는 불필요)
+#
+#  기본 모드(USE_CELERY=false)에서는 이 파일이 전혀 필요 없다.
+#  단일 프로세스 스레드풀로 대량 처리가 그대로 동작한다.
+#
+#  Celery 모드로 돌리고 싶을 때만:
+#      docker compose up -d redis worker
+#  그리고 앱 실행 시 환경변수 USE_CELERY=true 를 준다.
+#
+#  ※ 본 셋업 단계에서는 "정의만" 하고 실행하지 않는다.
+# ============================================================
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: thumbforge-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    image: python:3.12-slim
+    container_name: thumbforge-worker
+    working_dir: /app
+    # 프로젝트 소스를 그대로 마운트 (별도 Dockerfile 없이 기동)
+    volumes:
+      - ./:/app
+    environment:
+      USE_CELERY: "true"
+      REDIS_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONUTF8: "1"
+    # 컨테이너에는 celery + redis 클라이언트를 추가로 설치한다
+    # (requirements.txt 에는 기본 포함하지 않음)
+    command: >
+      bash -lc "
+        pip install --no-cache-dir -r requirements.txt 'celery[redis]==5.4.0' &&
+        celery -A app.jobs.celery_app:celery_app worker --loglevel=info --concurrency=2
+      "
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+# 참고: 웹(FastAPI) 컨테이너도 같은 네트워크에 올리려면 아래를 추가
+#  web:
+#    image: python:3.12-slim
+#    working_dir: /app
+#    volumes: [ "./:/app" ]
+#    environment:
+#      USE_CELERY: "true"
+#      REDIS_URL: "redis://redis:6379/0"
+#    command: >
+#      bash -lc "pip install --no-cache-dir -r requirements.txt 'celery[redis]==5.4.0' &&
+#                uvicorn app.main:app --host 0.0.0.0 --port 8000"
+#    ports: [ "8000:8000" ]
+#    depends_on: [ redis ]
