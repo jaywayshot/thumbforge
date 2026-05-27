@@ -303,6 +303,49 @@ python scripts/eval_llm_quality.py --provider mock     # 무료(로직 점검)
 
 ---
 
+## 🏠 라이프스타일 생성 (제품 정보 → 실제 AI 배경)
+
+제품 정보(카테고리/사이즈/재질/색상/공간/무드)를 입력하면 **실제 AI 이미지 생성**으로
+라이프스타일 신(벽지·바닥·소품·조명)을 만들고, 카테고리에 맞게 제품을 배치합니다.
+
+### 동작 흐름
+
+1. **제품 정보 입력**(단일 생성 탭 "2. 제품 정보"): 8개 카테고리(가구/의류/식품/전자제품/뷰티/생활용품/액세서리/기타) + 하위 분류 + 사이즈(cm 또는 S/M/L) + 재질/색상/공간/타겟/무드
+2. **신 프롬프트 자동 생성**(`app/core/scene_prompt.py`): 카테고리별 신 템플릿 + 18컨셉 무드 + 제품정보(영문화) → positive/negative. **제품 자체는 negative로 차단(배경만 생성)**
+3. **실제 배경 생성**: Stability SDXL(1024) → 실패 시 DALL-E 3 → 둘 다 안 되면 mock(서비스 안 죽음)
+4. **카테고리별 배치**(`app/core/placement.py`): 가구=바닥·강한 그림자, 의류=매달린 듯·약한 그림자, 식품/전자=바닥, 뷰티/액세서리=진열. 배경과 색 ±5% 조화(harmonize)
+5. **자체 검수**: 저대비/단색/생성실패 검출 시 1회 재생성
+
+> **제품 원본 훼손 금지** 원칙 유지 — 누끼된 실제 제품은 그대로 두고 배경만 AI로 생성합니다.
+
+### 환경변수
+
+```env
+STABILITY_API_KEY=sk-...      # 주 provider (SDXL)
+OPENAI_API_KEY=sk-...         # 폴백 (DALL-E 3)
+```
+
+- `product_info` 가 있으면 `BG_PROVIDER` 설정과 무관하게 자동으로 실제 배경 생성을 시도합니다.
+- 키가 전혀 없으면 mock 그라데이션으로 폴백(무료, 에러 없음).
+
+### 비용 / 캐싱
+
+- 1장당 대략 **Stability ~25원 / DALL-E ~50원** (생성 버튼 옆에 예상 비용 표시). 호출당 비용은 `logging.info` 로 기록.
+- 기본 **1장 생성**, "+ 1장 더 만들기" 버튼으로 같은 설정 추가 생성(다른 시드/레이아웃)
+- 동일 `(제품정보, 컨셉, 플랫폼)` 조합은 24시간 캐시(`workspace/temp/scene_cache/`) → 재생성 시 API 재호출 없음. 요청 `fresh:true` 로 무시.
+
+### 레퍼런스 이미지 (선택)
+
+"이런 느낌" 이미지를 올리면 **로컬에서만** 분석(dominant 색3·톤·무드, 외부 전송 없음)해
+신 프롬프트에 반영합니다. (`POST /api/reference/upload`)
+
+### 검증
+
+- `workspace/outputs/_qa_sample/sample.png` — 셀프 QA 샘플(gitignore, 커밋 안 함)
+- 실호출 통합 테스트: `RUN_LIVE_IMAGE_TEST=true python -m pytest tests/test_placement.py`
+
+---
+
 ## 👍 피드백 시스템 (variant 선호 데이터 축적)
 
 생성된 4~6개 variant 중 사용자가 "좋다/별로다/안 쓴다"를 표시하면, 그 데이터를 쌓아
@@ -504,6 +547,7 @@ sudo apt install fonts-nanum
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
 | 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 깊이 구현) | ✅ 검증레이어(누락/길이/금지어 재호출)·캐시(24h,1MB)·사용량(/api/llm/usage)·평가도구. 키 없으면 mock 폴백 (상단 "LLM 문구 추천" 절) |
 | 다음 | variant 피드백 수집 + 성과 분석 (winner/loser, 컨셉·레이아웃·provider별 통계) | ✅ append-only jsonl(1MB 회전)·CSV export·성과분석 탭 (상단 "피드백 시스템" 절) |
+| 핵심 | 라이프스타일 생성 (제품정보 → 실제 AI 배경 + 카테고리별 배치) | ✅ Stability SDXL→DALL-E 폴백·scene_prompt·placement·레퍼런스·1장기본·비용표시 (상단 "라이프스타일 생성" 절) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
 | 다음 | 경쟁사 URL 분석 (쿠팡/11번가/네이버 어댑터, 색감/뱃지 패턴 → 컨셉 추천) | ⚠️ 구현 완료·**실수집 보류**: 3사 모두 정적 HTML 차단(상단 "경쟁사 분석" 절 참고). 공식 API 경로 안내. 모킹 로직 검증 유지 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
