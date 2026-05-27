@@ -31,6 +31,7 @@ from app.services.concept_loader import (
     get_concept,
     get_platform,
 )
+from app.services import job_store
 from app.services.storage import find_upload, job_output_dir, new_job_id, open_image
 from app.settings import settings
 
@@ -98,6 +99,7 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
     job_id = new_job_id()
     out_dir = job_output_dir(job_id)
     variants: list[Variant] = []
+    variant_meta: dict[str, dict] = {}  # 피드백 복원용 (variant_id → 메타)
 
     for i in range(max(1, req.variants)):
         seed = random.randint(1, 10_000_000)
@@ -173,9 +175,31 @@ def run_generation(req: GenerateRequest) -> GenerateResponse:
             layout_used=layout_name,
             seed=seed,
         ))
+        variant_meta[variant_id] = {
+            "layout_used": layout_name,
+            "headline": headline,
+            "sub_text": sub,
+            "badge": badge,
+            "has_discount": bool(text_input.discount_percent),
+            "ctr_estimate": ctr,
+        }
 
     # CTR 높은 순으로 정렬
     variants.sort(key=lambda v: v.ctr_score, reverse=True)
+
+    # 피드백 복원용 generation 메타데이터 영속화 (워크스페이스에만 저장)
+    try:
+        job_store.save_generation_meta(
+            job_id,
+            upload_id=req.upload_id,
+            category=category,
+            concept=req.concept,
+            platform=req.platform,
+            text_provider=(settings.text_provider or "mock").lower(),
+            variants=variant_meta,
+        )
+    except Exception:
+        pass  # 메타 저장 실패가 생성 자체를 막지 않도록
 
     elapsed = int((time.time() - t0) * 1000)
     return GenerateResponse(
