@@ -196,12 +196,17 @@
           </div>
         </div>
 
-        <label>헤드라인 (비우면 AI 추천)</label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px;">
+          <label style="margin:0;">헤드라인 (비우면 AI 추천)</label>
+          <button id="llmBtn" class="secondary" type="button"
+                  style="width:auto; margin:0; padding:5px 10px; font-size:12px;">✨ LLM 문구 생성</button>
+        </div>
         <input id="headline" type="text" placeholder="예: 오늘의 베스트" />
         <label>서브 텍스트</label>
         <input id="sub" type="text" placeholder="예: 무료배송 · 당일출고" />
         <label>뱃지</label>
         <input id="badge" type="text" placeholder="예: BEST" />
+        <div id="llmMsg" style="font-size:11px; color:var(--muted); margin-top:6px;"></div>
 
         <button id="genBtn" class="primary" disabled>썸네일 생성하기</button>
       </div>
@@ -381,6 +386,7 @@ loadOptions();
 const drop = $("#drop"), fileInput = $("#file"), preview = $("#preview");
 const genBtn = $("#genBtn"), results = $("#results"), uploadMeta = $("#uploadMeta");
 let currentUpload = null;
+let currentCategory = "general";
 
 drop.addEventListener("click", () => fileInput.click());
 drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("hover"); });
@@ -403,6 +409,7 @@ async function handleFile(file) {
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     currentUpload = data.upload_id;
+    currentCategory = data.detected_category || "general";
     uploadMeta.innerHTML = `
       <span class="tag">${data.width}×${data.height}</span>
       <span class="tag">${data.has_alpha ? "투명 PNG" : "JPG/배경 있음"}</span>
@@ -471,6 +478,39 @@ function renderResults(data) {
     </div>
     <div class="results-grid">${grid}</div>`;
 }
+
+/* LLM 문구 생성 */
+const llmBtn = $("#llmBtn"), llmMsg = $("#llmMsg");
+llmBtn.addEventListener("click", async () => {
+  llmBtn.disabled = true;
+  const orig = llmBtn.textContent;
+  llmBtn.textContent = "생성 중...";
+  llmMsg.textContent = "";
+  try {
+    const res = await fetch(API + "/api/text/suggest", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        category: currentCategory,
+        concept: $("#concept").value,
+        platform: $("#platform").value,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    if (data.headline) $("#headline").value = data.headline;
+    if (data.sub_text) $("#sub").value = data.sub_text;
+    if (data.badge) $("#badge").value = data.badge;
+    const note = data.provider === "mock"
+      ? "mock 문구(키 없음 — 무료)로 채웠습니다."
+      : `${data.provider} 문구로 채웠습니다. 이 호출은 약 0.001원 미만 소요됩니다.`;
+    llmMsg.textContent = "✓ " + note;
+  } catch (e) {
+    llmMsg.innerHTML = `<span style="color:var(--danger);">문구 생성 실패: ${e.message}</span>`;
+  } finally {
+    llmBtn.disabled = false;
+    llmBtn.textContent = orig;
+  }
+});
 
 /* 대량 */
 const dropZip = $("#dropZip"), fileZip = $("#fileZip"), bulkBtn = $("#bulkBtn"), bulkStatus = $("#bulkStatus");
