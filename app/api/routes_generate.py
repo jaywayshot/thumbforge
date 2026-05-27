@@ -11,6 +11,7 @@ from app.services.concept_loader import (
     list_platform_names,
     get_concepts,
     get_platforms,
+    get_categories,
 )
 
 router = APIRouter(prefix="/api", tags=["generate"])
@@ -42,4 +43,17 @@ async def list_platforms() -> dict:
     return {
         k: {"label": v.get("label", k), "sizes": v.get("sizes", {})}
         for k, v in get_platforms().items()
+    }
+
+
+@router.get("/categories")
+async def list_categories() -> dict:
+    """카테고리 → 라벨/추천 컨셉/기본 레이아웃 (UI 자동 추천용)"""
+    return {
+        k: {
+            "label": v.get("label", k),
+            "recommended_concepts": v.get("recommended_concepts", []),
+            "default_layout": v.get("default_layout", "center_product"),
+        }
+        for k, v in get_categories().items()
     }

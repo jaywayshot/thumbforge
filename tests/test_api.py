@@ -61,7 +61,16 @@ def test_concepts_and_platforms():
     platforms = rp.json()
     assert "coupang" in platforms
     assert "sizes" in platforms["coupang"]
-    print(f"  ✓ concepts={len(concepts)}개, platforms={len(platforms)}개")
+
+    rcat = client.get("/api/categories")
+    assert rcat.status_code == 200
+    categories = rcat.json()
+    assert "general" in categories
+    assert "recommended_concepts" in categories["general"]
+    # 추천 컨셉이 실제 컨셉을 가리켜야 함
+    for rec in categories["general"]["recommended_concepts"]:
+        assert rec in concepts, f"존재하지 않는 추천 컨셉: {rec}"
+    print(f"  ✓ concepts={len(concepts)}개, platforms={len(platforms)}개, categories={len(categories)}개")
 
 
 def test_brand_crud():
