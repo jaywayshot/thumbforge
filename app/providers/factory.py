@@ -31,7 +31,11 @@ def get_background_provider() -> BackgroundProvider:
 
 @lru_cache(maxsize=1)
 def get_text_provider() -> TextSuggestionProvider:
-    # 현재는 mock만 지원 (실제 LLM 어댑터 추가 자리)
+    name = (settings.text_provider or "mock").lower()
+    if name == "openai":
+        # 키 없으면 OpenAITextSuggestionProvider 내부에서 자동 mock 폴백
+        from app.providers.openai_provider import OpenAITextSuggestionProvider
+        return OpenAITextSuggestionProvider()
     return MockTextSuggestionProvider()
 
 
