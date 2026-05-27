@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import random
+from functools import lru_cache
 from typing import Optional
 
 import numpy as np
@@ -147,7 +148,7 @@ class MockBackgroundProvider(BackgroundProvider):
 # 카테고리/컨셉별 문구 템플릿
 _HEADLINE_BANK = {
     "health_food": ["하루 한 알의 건강", "내 몸을 위한 선택", "프리미엄 건강 라인", "오늘부터 시작"],
-    "electronics": ["새로운 일상의 시작", "더 빠르게, 더 정확하게", "디테일까지 완벽", "Pro급 성능"],
+    "electronics": ["새로운 일상의 시작", "더 빠르게, 더 정확하게", "디테일이 다르다", "Pro급 성능"],
     "kitchen": ["주방의 품격", "오래 쓰는 진짜", "한 번 쓰면 인생템", "셰프의 선택"],
     "fashion": ["이 계절의 핫 아이템", "감성을 입다", "데일리 머스트해브", "트렌드 NEW"],
     "car": ["내 차의 업그레이드", "운전이 편해진다", "프로 드라이버 추천"],
@@ -164,17 +165,50 @@ _SUB_BANK = {
     "fashion": ["사이즈 다양", "당일 출고", "교환 무료"],
 }
 
-_BADGE_BANK = ["BEST", "NEW", "HOT", "MD's PICK", "리뷰 1위", "인기급상승"]
+_BADGE_BANK = ["BEST", "NEW", "HOT", "MD's PICK", "리뷰 화제", "인기급상승"]
+
+
+@lru_cache(maxsize=1)
+def _all_forbidden_words() -> tuple[str, ...]:
+    """모든 플랫폼 금지어의 합집합 (mock 추천 문구 자기검열용).
+
+    플랫폼 인자가 suggest() 에 없으므로, 어떤 플랫폼에 올려도 안전하도록
+    전 플랫폼 금지어를 모은다. 설정 로드 실패 시 빈 튜플 → 필터 미적용(안전 저하 없음)."""
+    try:
+        from app.services.concept_loader import get_platforms
+        words: set[str] = set()
+        for p in get_platforms().values():
+            for w in (p.get("forbidden_words", []) or []):
+                if w:
+                    words.add(w)
+        return tuple(words)
+    except Exception:
+        return ()
+
+
+def _is_safe(text: str) -> bool:
+    if not text:
+        return True
+    return not any(w in text for w in _all_forbidden_words())
+
+
+def _pick_safe(candidates: list[str], fallback: str) -> str:
+    """금지어가 없는 후보를 우선 선택. 전부 걸리면 fallback."""
+    safe = [c for c in candidates if _is_safe(c)]
+    if safe:
+        return random.choice(safe)
+    return fallback if _is_safe(fallback) else ""
 
 
 class MockTextSuggestionProvider(TextSuggestionProvider):
     def suggest(self, category: str, concept: str, product_hint: Optional[str] = None) -> dict:
         headlines = _HEADLINE_BANK.get(category, _HEADLINE_BANK["general"])
         subs = _SUB_BANK.get(category, _SUB_BANK["general"])
+        # 뱅크에 실수로 금지어가 섞여도 사후 필터로 걸러낸다
         return {
-            "headline": random.choice(headlines),
-            "sub_text": random.choice(subs),
-            "badge": random.choice(_BADGE_BANK),
+            "headline": _pick_safe(headlines, "오늘의 추천"),
+            "sub_text": _pick_safe(subs, "빠른 배송"),
+            "badge": _pick_safe(_BADGE_BANK, "NEW"),
         }
 
 

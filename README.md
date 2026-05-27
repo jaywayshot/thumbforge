@@ -290,6 +290,7 @@ sudo apt install fonts-nanum
 
 | 증상 | 해결 |
 |---|---|
+| `numpy`/빌드 실패 (Python 3.13+) | 3.13/3.14는 옛 핀 버전 휠이 없어 빌드로 떨어짐. `pip install -r requirements-py314.txt` 사용 (setup 스크립트는 자동 선택) |
 | `rembg` 설치 실패 | `pip install --upgrade pip setuptools wheel` 후 재시도 |
 | 첫 생성이 느림 | rembg 모델 다운로드. 2회차부터 빨라짐 |
 | 한글이 ⬜로 보임 | 위의 "한글 폰트가 안 보일 때" 참고 |
