@@ -30,3 +30,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+workspace/outputs/_qa_sample/
+workspace/temp/scene_cache.json
