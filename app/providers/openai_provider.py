@@ -32,6 +32,7 @@ class OpenAIBackgroundProvider(BackgroundProvider):
     def __init__(self) -> None:
         self._fallback = MockBackgroundProvider()
         self._client = None
+        self.last_provider = "mock"
         if settings.openai_api_key:
             try:
                 from openai import OpenAI
@@ -43,6 +44,7 @@ class OpenAIBackgroundProvider(BackgroundProvider):
                  prompt: Optional[tuple] = None) -> Image.Image:
         import logging
         logger = logging.getLogger("thumbforge")
+        self.last_provider = "mock"
         if self._client is None:
             return self._fallback.generate(width, height, concept, seed)
 
@@ -67,6 +69,7 @@ class OpenAIBackgroundProvider(BackgroundProvider):
             b64 = result.data[0].b64_json
             img = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
             logger.info("[openai] DALL-E 3 배경 생성 성공 비용=~$%.4f", self._EST_COST_USD)
+            self.last_provider = "dalle"
             return img.resize((width, height), Image.LANCZOS)
         except Exception as e:
             logger.warning("[openai] 배경 생성 실패, mock 폴백: %s", e)

@@ -90,6 +90,7 @@ class GenerateResponse(BaseModel):
     variants: List[Variant]
     elapsed_ms: int
     bg_mode: str = "mock"               # mock | scene (라이프스타일 AI 배경)
+    bg_provider_used: str = "mock"      # mock | stability | dalle | cached (실제 사용)
     scene_positive: Optional[str] = None  # 사용된 신 프롬프트(검수용)
     scene_negative: Optional[str] = None
 
