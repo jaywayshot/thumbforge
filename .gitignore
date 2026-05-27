@@ -14,9 +14,13 @@ env/
 .env
 .env.local
 
-# Workspace (생성물)
+# Workspace (생성물) — 아래 전부 포함(QA 샘플/캐시/피드백/job 메타 등 절대 커밋 금지)
 workspace/
 !workspace/.gitkeep
+# (명시) 라이프스타일 QA 샘플 / LLM·scene 캐시 — workspace/ 에 포함되어 이미 무시됨
+workspace/outputs/_qa_sample/
+workspace/temp/scene_cache/
+workspace/temp/*_cache.json
 
 # OS
 .DS_Store

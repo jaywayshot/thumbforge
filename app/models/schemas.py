@@ -28,15 +28,44 @@ class TextOption(BaseModel):
     discount_percent: Optional[int] = None
 
 
+class ProductInfo(BaseModel):
+    """제품 정보 - 라이프스타일 신 생성 + 카테고리별 배치에 사용"""
+    product_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    category: str = "기타"          # 가구/의류/식품/전자제품/뷰티/생활용품/액세서리/기타
+    sub_category: Optional[str] = None
+    size_w: Optional[float] = None  # 가로 cm
+    size_h: Optional[float] = None  # 세로 cm
+    size_d: Optional[float] = None  # 깊이 cm
+    size_label: Optional[str] = None  # S/M/L (사이즈 모를 때 대체)
+    material: Optional[str] = None
+    color: Optional[str] = None
+    use_space: Optional[str] = None  # 거실/침실/주방/욕실/사무실/야외/공용
+    target_audience: Optional[str] = None
+    mood_keywords: Optional[List[str]] = None
+
+    def cache_signature(self) -> str:
+        """프롬프트 캐시 키용 안정 문자열 (None 은 빈값)."""
+        parts = [
+            self.category or "", self.sub_category or "", self.material or "",
+            self.color or "", self.use_space or "",
+            ",".join(self.mood_keywords or []),
+        ]
+        return "|".join(parts)
+
+
 class GenerateRequest(BaseModel):
     upload_id: str
     concept: str = "white_minimal"
     platform: str = "coupang"
-    variants: int = 4
+    variants: int = 1                  # 기본 1장 (비용 절약, 더만들기 버튼으로 추가)
     text: TextOption = Field(default_factory=TextOption)
     category_hint: Optional[str] = None
     keep_product_intact: bool = True  # 핵심 원칙: 제품 원본 훼손 금지
     brand_id: Optional[str] = None    # 브랜드 프리셋 적용 (컬러/로고/폰트)
+    product_info: Optional[ProductInfo] = None  # 라이프스타일 신 생성용
+    reference_id: Optional[str] = None  # 레퍼런스 이미지 분석 결과 적용
+    fresh: bool = False                # 프롬프트/배경 캐시 무시
 
 
 # ===== 생성 응답 =====
@@ -60,6 +89,9 @@ class GenerateResponse(BaseModel):
     platform: str
     variants: List[Variant]
     elapsed_ms: int
+    bg_mode: str = "mock"               # mock | scene (라이프스타일 AI 배경)
+    scene_positive: Optional[str] = None  # 사용된 신 프롬프트(검수용)
+    scene_negative: Optional[str] = None
 
 
 # ===== 검수 결과 =====

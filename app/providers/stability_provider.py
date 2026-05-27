@@ -1,50 +1,92 @@
 """
-Stability AI Provider - SD3 / SDXL 등
+Stability AI Provider — SDXL 1024 라이프스타일 배경 생성
+
+─ 모델: stable-diffusion-xl-1024-v1-0 (cfg_scale 7, steps 30)
+─ 응답 base64 → PIL Image
+─ 실패 시 OpenAI(DALL-E 3) 폴백 → 그것도 실패하면 mock 폴백(서비스 안 죽음)
+─ 호출당 예상 비용 logging.info 기록
 """
 from __future__ import annotations
 
+import base64
 import io
-from PIL import Image
+import logging
+from typing import Optional
 
 import httpx
+from PIL import Image
 
 from app.providers.base import BackgroundProvider
 from app.providers.mock import MockBackgroundProvider
 from app.settings import settings
+
+logger = logging.getLogger("thumbforge")
+
+_SDXL_URL = "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
+_EST_COST_USD = 0.018  # SDXL 1024 1장 대략 (~25원)
+
+_DEFAULT_NEG = (
+    "product, item, foreground subject, watermark, text, logo, "
+    "multiple objects, blurry, low quality, distorted, person, mannequin"
+)
+
+
+def _prompt_pair(concept: dict, prompt: Optional[tuple]) -> tuple[str, str]:
+    if prompt and prompt[0]:
+        return prompt[0], (prompt[1] or _DEFAULT_NEG)
+    kw = concept.get("prompt_keywords", "minimal product background")
+    pos = (f"professional product photography background only, no product, no text. "
+           f"{kw}, studio quality, soft lighting, 4k")
+    return pos, _DEFAULT_NEG
 
 
 class StabilityBackgroundProvider(BackgroundProvider):
     def __init__(self) -> None:
         self._fallback = MockBackgroundProvider()
 
-    def generate(self, width: int, height: int, concept: dict, seed: int = 0) -> Image.Image:
-        if not settings.stability_api_key:
-            return self._fallback.generate(width, height, concept, seed)
+    def generate(self, width: int, height: int, concept: dict, seed: int = 0,
+                 prompt: Optional[tuple] = None) -> Image.Image:
+        positive, negative = _prompt_pair(concept, prompt)
 
+        if settings.stability_api_key:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {settings.stability_api_key}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                }
+                body = {
+                    "text_prompts": [
+                        {"text": positive, "weight": 1.0},
+                        {"text": negative, "weight": -1.0},
+                    ],
+                    "cfg_scale": 7,
+                    "steps": 30,
+                    "width": 1024,
+                    "height": 1024,
+                    "samples": 1,
+                    "seed": int(seed) % 4294967295,
+                }
+                r = httpx.post(_SDXL_URL, headers=headers, json=body, timeout=90.0)
+                if r.status_code == 200:
+                    b64 = r.json()["artifacts"][0]["base64"]
+                    img = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+                    logger.info("[stability] SDXL 생성 성공 비용=~$%.4f (seed=%s)", _EST_COST_USD, seed)
+                    return img.resize((width, height), Image.LANCZOS)
+                logger.warning("[stability] %s: %s → DALL-E 폴백", r.status_code, r.text[:200])
+            except Exception as e:
+                logger.warning("[stability] 실패 → DALL-E 폴백: %s", e)
+        else:
+            logger.info("[stability] 키 없음 → DALL-E 폴백 시도")
+
+        # 1차 폴백: OpenAI DALL-E 3
         try:
-            prompt_kw = concept.get("prompt_keywords", "minimal product background")
-            prompt = (
-                f"professional product photography background, NO product, NO text. "
-                f"{prompt_kw}, studio quality, 8k"
-            )
-            url = "https://api.stability.ai/v2beta/stable-image/generate/core"
-            headers = {
-                "authorization": f"Bearer {settings.stability_api_key}",
-                "accept": "image/*",
-            }
-            files = {"none": ""}
-            data = {
-                "prompt": prompt,
-                "output_format": "png",
-                "aspect_ratio": "1:1",
-                "seed": seed,
-            }
-            r = httpx.post(url, headers=headers, files=files, data=data, timeout=60.0)
-            if r.status_code != 200:
-                print(f"[stability] {r.status_code}: {r.text[:200]}")
-                return self._fallback.generate(width, height, concept, seed)
-            img = Image.open(io.BytesIO(r.content)).convert("RGB")
-            return img.resize((width, height), Image.LANCZOS)
+            from app.providers.openai_provider import OpenAIBackgroundProvider
+            oai = OpenAIBackgroundProvider()
+            if oai._client is not None:
+                return oai.generate(width, height, concept, seed=seed, prompt=(positive, negative))
         except Exception as e:
-            print(f"[stability] 실패, mock 폴백: {e}")
-            return self._fallback.generate(width, height, concept, seed)
+            logger.warning("[stability] DALL-E 폴백도 실패: %s", e)
+
+        # 최종 폴백: mock
+        return self._fallback.generate(width, height, concept, seed)

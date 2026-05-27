@@ -25,7 +25,9 @@ from app.settings import settings
 
 
 class OpenAIBackgroundProvider(BackgroundProvider):
-    """gpt-image-1 / DALL-E 3로 배경 생성"""
+    """DALL-E 3 로 라이프스타일 배경 생성 (Stability 폴백 경로로도 쓰임)"""
+
+    _EST_COST_USD = 0.04  # dall-e-3 standard 1024 (~50원)
 
     def __init__(self) -> None:
         self._fallback = MockBackgroundProvider()
@@ -37,30 +39,37 @@ class OpenAIBackgroundProvider(BackgroundProvider):
             except ImportError:
                 print("[openai] 'openai' 패키지 미설치, mock 폴백")
 
-    def generate(self, width: int, height: int, concept: dict, seed: int = 0) -> Image.Image:
+    def generate(self, width: int, height: int, concept: dict, seed: int = 0,
+                 prompt: Optional[tuple] = None) -> Image.Image:
+        import logging
+        logger = logging.getLogger("thumbforge")
         if self._client is None:
             return self._fallback.generate(width, height, concept, seed)
 
         try:
-            prompt_kw = concept.get("prompt_keywords", "minimal product background")
-            prompt = (
-                f"professional e-commerce product photography background only, "
-                f"NO product, NO text, NO logo. {prompt_kw}. "
-                f"clean composition, studio lighting, 4k"
-            )
-            # gpt-image-1은 1024x1024 / 1536x1024 / 1024x1536만 지원
-            size = "1024x1024"
+            if prompt and prompt[0]:
+                # DALL-E 는 negative prompt 미지원 → positive 에 제외 지시를 자연어로 포함
+                neg = prompt[1] or ""
+                text = (f"{prompt[0]}. Important: this is an empty background scene only, "
+                        f"do NOT include any product, item, person, text, or logo. Avoid: {neg}")
+            else:
+                kw = concept.get("prompt_keywords", "minimal product background")
+                text = (f"professional e-commerce product photography background only, "
+                        f"NO product, NO text, NO logo. {kw}. clean composition, studio lighting, 4k")
             result = self._client.images.generate(
-                model="gpt-image-1",
-                prompt=prompt,
-                size=size,
+                model="dall-e-3",
+                prompt=text[:3900],   # DALL-E 프롬프트 길이 제한 대비
+                size="1024x1024",
+                quality="standard",   # hd 는 비용 2배 → standard 고정
                 n=1,
+                response_format="b64_json",
             )
             b64 = result.data[0].b64_json
             img = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+            logger.info("[openai] DALL-E 3 배경 생성 성공 비용=~$%.4f", self._EST_COST_USD)
             return img.resize((width, height), Image.LANCZOS)
         except Exception as e:
-            print(f"[openai] 배경 생성 실패, mock 폴백: {e}")
+            logger.warning("[openai] 배경 생성 실패, mock 폴백: %s", e)
             return self._fallback.generate(width, height, concept, seed)
 
 

@@ -32,6 +32,12 @@ def get_categories() -> Dict[str, Dict[str, Any]]:
     return _load_yaml("categories.yaml").get("categories", {})
 
 
+@lru_cache(maxsize=1)
+def get_categories_v2() -> Dict[str, Dict[str, Any]]:
+    """라이프스타일 신 생성용 카테고리 마스터 (한글 키)."""
+    return _load_yaml("categories_v2.yaml").get("categories", {})
+
+
 # ───────── 헬퍼 ─────────
 
 def get_concept(name: str) -> Dict[str, Any]:

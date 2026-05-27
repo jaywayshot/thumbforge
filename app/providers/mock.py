@@ -119,7 +119,9 @@ def _add_spotlight(img: Image.Image, intensity: float = 0.15) -> Image.Image:
 class MockBackgroundProvider(BackgroundProvider):
     """그라데이션/패턴 기반 로컬 배경"""
 
-    def generate(self, width: int, height: int, concept: dict, seed: int = 0) -> Image.Image:
+    def generate(self, width: int, height: int, concept: dict, seed: int = 0,
+                 prompt: Optional[tuple] = None) -> Image.Image:
+        # mock 은 로컬 그라데이션 합성 — prompt 는 사용하지 않는다.
         random.seed(seed)
         np.random.seed(seed % (2**32))
 

@@ -16,8 +16,13 @@ class BackgroundProvider(ABC):
         height: int,
         concept: dict,
         seed: int = 0,
+        prompt: Optional[tuple] = None,
     ) -> Image.Image:
-        """concept 설정에 맞는 배경 이미지 (RGB or RGBA) 반환"""
+        """concept 설정에 맞는 배경 이미지 (RGB or RGBA) 반환.
+
+        prompt: (positive, negative) 영문 프롬프트. 주어지면 라이프스타일 신 생성에 사용.
+                없으면 concept.prompt_keywords 로 기본 배경 생성.
+        """
         ...
 
 
