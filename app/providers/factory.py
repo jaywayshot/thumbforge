@@ -36,6 +36,9 @@ def get_text_provider() -> TextSuggestionProvider:
         # 키 없으면 OpenAITextSuggestionProvider 내부에서 자동 mock 폴백
         from app.providers.openai_provider import OpenAITextSuggestionProvider
         return OpenAITextSuggestionProvider()
+    if name == "anthropic":
+        from app.providers.anthropic_provider import AnthropicTextSuggestionProvider
+        return AnthropicTextSuggestionProvider()
     return MockTextSuggestionProvider()
 
 

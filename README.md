@@ -326,7 +326,7 @@ sudo apt install fonts-nanum
 | v2 | **대량 ZIP 업로드 → 일괄 처리 → 결과 ZIP** (인메모리 job queue) | ✅ |
 | v2 | **브랜드 관리** (로고/컬러/폰트/기본문구/금지어) | ✅ |
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
-| 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | 🔜 인터페이스만 |
+| 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 어댑터 본 구현) | ✅ (TEXT_PROVIDER=openai/anthropic, 키 없으면 mock 폴백) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
 | 다음 | 경쟁사 URL 분석 (쿠팡 상위 썸네일 색감/문구 패턴) | 🔜 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
