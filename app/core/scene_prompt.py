@@ -17,14 +17,16 @@ from app.models.schemas import ProductInfo
 # ───────── 카테고리별 신 템플릿 (영문) ─────────
 # {use_space}, {color}, {mood} 치환
 CATEGORY_SCENE: Dict[str, str] = {
-    "가구": "spacious minimal {use_space} interior, {color} walls, wooden flooring, "
-            "soft natural daylight from large window, {mood} atmosphere, empty staging area",
-    "의류": "minimal clothing rack in {use_space}, white walls with line art posters, "
-            "wooden floor, soft natural lighting, scandinavian style, {mood} atmosphere",
-    "식품": "clean kitchen counter with marble surface, soft window light, minimal styling, "
-            "natural ingredients in background, {mood} atmosphere",
-    "전자제품": "minimal modern desk setup in {use_space}, white wall background, "
-                "soft directional lighting, professional product shot environment, {mood}",
+    # 가구/전자: 제품과 겹치는 가구·기기가 없는 '빈 공간' 으로 생성(중복 객체 방지)
+    "가구": "empty {use_space} interior with bare {color} walls and wooden flooring, "
+            "completely empty floor space, soft natural daylight from large window, "
+            "no furniture, {mood} atmosphere",
+    "의류": "empty minimal {use_space} with bare white walls and wooden floor, "
+            "soft natural lighting, scandinavian style, clean empty space, {mood} atmosphere",
+    "식품": "clean empty kitchen counter with marble surface, soft window light, "
+            "minimal styling, bare countertop, {mood} atmosphere",
+    "전자제품": "empty minimal desk surface in {use_space}, bare {color} wall background, "
+                "soft directional lighting, clean empty tabletop, {mood}",
     "뷰티": "clean cosmetics shelf with marble background, soft pink and beige tones, "
             "delicate flowers, soft diffused lighting, {mood} atmosphere",
     "액세서리": "minimal display surface with neutral fabric, soft lighting, "
@@ -58,6 +60,17 @@ CONCEPT_MOOD: Dict[str, List[str]] = {
     "apple_style": ["ultra minimal", "clean premium", "lots of whitespace"],
 }
 _DEFAULT_MOOD = ["clean", "minimal", "professional"]
+
+# 카테고리별로 '배경에 그리면 안 되는' 제품군 객체(중복 방지) — negative 에 주입
+_EXCLUDE_OBJECTS: Dict[str, List[str]] = {
+    "가구": ["furniture", "desk", "table", "sofa", "chair", "shelf", "bed", "cabinet", "wardrobe"],
+    "전자제품": ["electronic device", "laptop", "monitor", "computer", "phone", "keyboard", "gadget"],
+    "식품": ["food", "dish", "plated food", "ingredients on the counter", "snack"],
+    "의류": ["clothes", "garment", "clothing", "mannequin", "apparel"],
+    "뷰티": ["cosmetic product", "bottle", "cream jar", "skincare product"],
+    "액세서리": ["jewelry", "handbag", "watch", "accessory"],
+    "생활용품": ["household product", "appliance"],
+}
 
 # ───────── 한글 → 영문 매핑 ─────────
 _SPACE_EN = {
@@ -164,9 +177,11 @@ def build_scene_prompt(
         "person", "people", "human", "hands",
     ]
     if category == "의류":
-        negative_parts += ["mannequin", "clothing on body", "model wearing"]
+        negative_parts += ["clothing on body", "model wearing"]
     if category == "가구":
         negative_parts += ["people sitting", "crowd"]
+    # 카테고리 제품군 객체 차단(배경에 같은 종류 물건이 또 생기지 않게)
+    negative_parts += _EXCLUDE_OBJECTS.get(category, [])
     negative = ", ".join(negative_parts)
 
     return positive, negative
