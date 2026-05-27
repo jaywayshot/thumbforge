@@ -143,6 +143,31 @@
                          border: 1px solid var(--accent); color: var(--text); font-size: 13px; }
   .warn-box { color: var(--warning); padding: 12px; background: rgba(245,158,11,0.1);
               border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  /* 피드백 버튼 */
+  .fb { display: flex; gap: 6px; margin-top: 8px; }
+  .fb-btn { flex: 1; padding: 6px 0; font-size: 13px; border-radius: 6px; cursor: pointer;
+            background: var(--panel); color: var(--muted); border: 1px solid var(--border);
+            transition: 0.15s; }
+  .fb-btn:hover { color: var(--text); border-color: var(--accent); }
+  .fb-btn.active[data-t="winner"]  { background: var(--success); color: #fff; border-color: var(--success); }
+  .fb-btn.active[data-t="loser"]   { background: var(--warning); color: #fff; border-color: var(--warning); }
+  .fb-btn.active[data-t="discard"] { background: var(--danger);  color: #fff; border-color: var(--danger); }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+           background: var(--panel-2); color: var(--text); border: 1px solid var(--accent);
+           padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0;
+           transition: opacity 0.2s; pointer-events: none; z-index: 99; }
+  #toast.show { opacity: 1; }
+  /* 성과 분석 */
+  .stat-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+  .stat-row .name { width: 160px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stat-row .bar-wrap { flex: 1; height: 18px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .stat-row .bar { height: 100%; background: var(--success); }
+  .stat-row .val { width: 110px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  .summary-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .summary-card { flex: 1; min-width: 120px; background: var(--panel-2); border: 1px solid var(--border);
+                  border-radius: 10px; padding: 14px; text-align: center; }
+  .summary-card .big { font-size: 26px; font-weight: 700; }
+  .summary-card .lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -157,6 +182,7 @@
     <div class="tab" data-view="bulk">대량 처리</div>
     <div class="tab" data-view="brand">브랜드 관리</div>
     <div class="tab" data-view="analyze">경쟁사 분석</div>
+    <div class="tab" data-view="stats">성과 분석</div>
   </div>
 </header>
 
@@ -337,7 +363,22 @@
     </div>
   </div>
 
+  <!-- 성과 분석 -->
+  <div id="view-stats" class="view">
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0;">피드백 성과 분석</h2>
+        <a id="csvBtn" class="dl" style="width:auto; padding:8px 16px; text-decoration:none;"
+           href="/api/feedback/export.csv">⬇ CSV 다운로드</a>
+      </div>
+      <div id="statsBody">
+        <div class="results-empty">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
 </main>
+<div id="toast"></div>
 
 <script>
 const API = "";
@@ -350,6 +391,7 @@ $$(".tab").forEach(t => t.addEventListener("click", () => {
   t.classList.add("active");
   $("#view-" + t.dataset.view).classList.add("active");
   if (t.dataset.view === "brand") loadBrandList();
+  if (t.dataset.view === "stats") loadStats();
 }));
 
 let CONCEPTS = {}, PLATFORMS = {}, BRANDS = [];
@@ -459,6 +501,8 @@ function renderResults(data) {
     const cls = v.ctr_score >= 75 ? "" : v.ctr_score >= 55 ? "mid" : "low";
     const notes = v.qc_notes && v.qc_notes.length
       ? `<div class="notes">⚠ ${v.qc_notes.join(" · ")}</div>` : "";
+    // 전역 variant ID = job_id + "_" + variant_id (서버가 메타 복원에 사용)
+    const gid = `${data.job_id}_${v.variant_id}`;
     return `
       <div class="card">
         <div class="card-img"><img src="${API}${v.file_url}" /></div>
@@ -469,6 +513,14 @@ function renderResults(data) {
           </div>
           ${notes}
           <a class="dl" href="${API}${v.file_url}" download="${v.variant_id}.png">⬇ 다운로드</a>
+          <div class="fb">
+            <button class="fb-btn" data-t="winner" title="이거 좋다"
+                    onclick="sendFeedback('${gid}','winner',this)">👍</button>
+            <button class="fb-btn" data-t="loser" title="이거 별로다"
+                    onclick="sendFeedback('${gid}','loser',this)">👎</button>
+            <button class="fb-btn" data-t="discard" title="안 쓸 거다"
+                    onclick="sendFeedback('${gid}','discard',this)">✕</button>
+          </div>
         </div>
       </div>`;
   }).join("");
@@ -478,6 +530,34 @@ function renderResults(data) {
     </div>
     <div class="results-grid">${grid}</div>`;
 }
+
+/* 피드백 */
+let toastTimer = null;
+function showToast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1500);
+}
+
+window.sendFeedback = async (gid, type, btn) => {
+  const group = btn.parentElement;
+  try {
+    const res = await fetch(API + "/api/feedback", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variant_id: gid, feedback_type: type }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    // 같은 카드 내 다른 버튼 해제 후 이 버튼만 활성 (마지막 의견이 진실)
+    group.querySelectorAll(".fb-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    showToast("기록됨 ✓");
+  } catch (e) {
+    showToast("기록 실패: " + e.message);
+  }
+};
 
 /* LLM 문구 생성 */
 const llmBtn = $("#llmBtn"), llmMsg = $("#llmMsg");
@@ -685,6 +765,78 @@ $("#deleteBrand").addEventListener("click", async () => {
   loadBrandList();
   loadOptions();
 });
+
+/* 성과 분석 */
+async function loadStats() {
+  const body = $("#statsBody");
+  body.innerHTML = `<div class="results-empty">불러오는 중...</div>`;
+  try {
+    const s = await (await fetch(API + "/api/feedback/stats")).json();
+    renderStats(s);
+  } catch (e) {
+    body.innerHTML = `<div class="err">통계 로드 실패: ${e.message}</div>`;
+  }
+}
+
+function ratePct(r) { return r === null || r === undefined ? null : Math.round(r * 100); }
+
+function statBars(title, groups) {
+  const keys = Object.keys(groups || {}).filter(k => k && groups[k].winner_rate !== null);
+  if (!keys.length) return `<div class="analyze-section"><h3>${title}</h3>
+    <div style="color:var(--muted); font-size:12px;">winner/loser 데이터 없음</div></div>`;
+  // winner_rate 내림차순
+  keys.sort((a, b) => (groups[b].winner_rate || 0) - (groups[a].winner_rate || 0));
+  const rows = keys.map(k => {
+    const g = groups[k]; const pct = ratePct(g.winner_rate);
+    return `<div class="stat-row">
+      <span class="name" title="${k}">${k}</span>
+      <span class="bar-wrap"><span class="bar" style="width:${pct}%"></span></span>
+      <span class="val">${pct}% (👍${g.winner}/👎${g.loser})</span>
+    </div>`;
+  }).join("");
+  return `<div class="analyze-section"><h3>${title}</h3>${rows}</div>`;
+}
+
+function renderStats(s) {
+  const sm = s.summary || {};
+  const total = s.total_feedback || 0;
+  if (!total) {
+    $("#statsBody").innerHTML = `<div class="results-empty">
+      아직 피드백이 없습니다.<br/>단일 생성 결과 카드의 👍/👎 버튼을 눌러 데이터를 쌓아주세요.</div>`;
+    return;
+  }
+  const wPct = ratePct(sm.winner_rate);
+  const dc = s.discount || {};
+  const wd = dc.with_discount || {}, wod = dc.without_discount || {};
+  const pearson = s.ctr_vs_winner_pearson;
+
+  $("#statsBody").innerHTML = `
+    <div class="summary-cards">
+      <div class="summary-card"><div class="big">${total}</div><div class="lbl">총 피드백(변형별 최신)</div></div>
+      <div class="summary-card"><div class="big">${sm.winner || 0}</div><div class="lbl">👍 Winner</div></div>
+      <div class="summary-card"><div class="big">${sm.loser || 0}</div><div class="lbl">👎 Loser</div></div>
+      <div class="summary-card"><div class="big">${sm.discard || 0}</div><div class="lbl">✕ Discard</div></div>
+      <div class="summary-card"><div class="big">${wPct === null ? '-' : wPct + '%'}</div><div class="lbl">전체 Winner rate</div></div>
+    </div>
+    ${statBars("컨셉별 winner rate", s.by_concept)}
+    ${statBars("레이아웃별 winner rate", s.by_layout)}
+    ${statBars("Provider별 winner rate", s.by_provider)}
+    <div class="analyze-section">
+      <h3>할인 뱃지 유무</h3>
+      <div class="stat-row"><span class="name">할인 있음</span>
+        <span class="bar-wrap"><span class="bar" style="width:${ratePct(wd.winner_rate) || 0}%"></span></span>
+        <span class="val">${wd.winner_rate === null || wd.winner_rate === undefined ? '-' : ratePct(wd.winner_rate) + '%'} (👍${wd.winner||0}/👎${wd.loser||0})</span></div>
+      <div class="stat-row"><span class="name">할인 없음</span>
+        <span class="bar-wrap"><span class="bar" style="width:${ratePct(wod.winner_rate) || 0}%"></span></span>
+        <span class="val">${wod.winner_rate === null || wod.winner_rate === undefined ? '-' : ratePct(wod.winner_rate) + '%'} (👍${wod.winner||0}/👎${wod.loser||0})</span></div>
+    </div>
+    <div class="analyze-section">
+      <h3>CTR 추정 ↔ Winner 선택 상관(피어슨)</h3>
+      <div style="font-size:13px;">${pearson === null || pearson === undefined
+        ? '<span style="color:var(--muted);">표본 부족(또는 분산 0) — 데이터가 더 쌓이면 표시됩니다.</span>'
+        : `<strong>${pearson}</strong> <span style="color:var(--muted);">(표본 ${s.ctr_corr_sample_size}건, +1에 가까울수록 CTR 추정이 사용자 선택과 일치)</span>`}</div>
+    </div>`;
+}
 
 /* 경쟁사 분석 */
 const compBtn = $("#compBtn"), compResults = $("#compResults");

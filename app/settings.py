@@ -68,8 +68,17 @@ class Settings(BaseSettings):
     def temp_path(self) -> Path:
         return self.workspace_path / "temp"
 
+    @property
+    def jobs_path(self) -> Path:
+        return self.workspace_path / "jobs"
+
+    @property
+    def feedback_path(self) -> Path:
+        return self.workspace_path / "feedback"
+
     def ensure_dirs(self) -> None:
-        for p in (self.uploads_path, self.outputs_path, self.temp_path):
+        for p in (self.uploads_path, self.outputs_path, self.temp_path,
+                  self.jobs_path, self.feedback_path):
             p.mkdir(parents=True, exist_ok=True)
 
 

@@ -303,6 +303,48 @@ python scripts/eval_llm_quality.py --provider mock     # 무료(로직 점검)
 
 ---
 
+## 👍 피드백 시스템 (variant 선호 데이터 축적)
+
+생성된 4~6개 variant 중 사용자가 "좋다/별로다/안 쓴다"를 표시하면, 그 데이터를 쌓아
+어떤 **컨셉·레이아웃·문구 패턴**이 선호되는지 분석합니다. 데이터는 **외부로 전송하지 않고**
+`workspace/feedback/` 에만 저장됩니다.
+
+### 사용법 (브라우저)
+
+- **단일 생성** 결과 카드의 `👍 / 👎 / ✕` 버튼 → 즉시 기록(토스트 "기록됨")
+  - 같은 카드에서 다른 버튼을 누르면 덮어쓰기(마지막 의견이 진실)
+- **성과 분석** 탭 → 컨셉별/레이아웃별/provider별 winner rate(CSS 막대그래프),
+  할인 뱃지 유무 비교, CTR 추정 ↔ 선택 상관(피어슨), 상단 요약, CSV 다운로드
+
+### 저장 방식
+
+- `workspace/feedback/feedback.jsonl` 에 한 줄 = 한 피드백 (**append-only**)
+- **1MB 초과 시 회전**: `feedback.jsonl` → `feedback-001.jsonl` (rename, 원자적) 후 새 파일
+- 같은 variant 의 의견 변경은 새 줄로 추가되고, 조회 시 **가장 최근 항목만** 유효(무손실 + 덮어쓰기)
+- generation 메타데이터는 `workspace/jobs/<job_id>.json` 에 저장되어 피드백 시 자동 복원
+
+### API
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"variant_id":"<job_id>_v1","feedback_type":"winner"}'   # winner|loser|discard
+
+curl http://127.0.0.1:8000/api/feedback/recent?limit=50
+curl http://127.0.0.1:8000/api/feedback/stats
+curl -O http://127.0.0.1:8000/api/feedback/export.csv
+```
+
+### 도구 (수동 실행)
+
+```bash
+python scripts/seed_feedback.py          # 가짜 피드백 60건 생성(통계 화면 확인용)
+python scripts/seed_feedback.py --reset  # 시드 데이터만 삭제(실제 데이터 보존)
+python scripts/cleanup_old_jobs.py --days 30   # 30일 지난 generation 메타 정리
+```
+
+---
+
 ## 🎨 컨셉 추가/수정 (하드코딩 0)
 
 `config/concepts.yaml` 만 편집하면 새 컨셉이 즉시 UI에 노출됩니다.
@@ -461,6 +503,7 @@ sudo apt install fonts-nanum
 | v2 | **브랜드 관리** (로고/컬러/폰트/기본문구/금지어) | ✅ |
 | v2 | **CTR 점수 강화** (시선 집중도 + 색 다양성) | ✅ |
 | 다음 | 실제 LLM 문구 추천 (OpenAI/Anthropic 깊이 구현) | ✅ 검증레이어(누락/길이/금지어 재호출)·캐시(24h,1MB)·사용량(/api/llm/usage)·평가도구. 키 없으면 mock 폴백 (상단 "LLM 문구 추천" 절) |
+| 다음 | variant 피드백 수집 + 성과 분석 (winner/loser, 컨셉·레이아웃·provider별 통계) | ✅ append-only jsonl(1MB 회전)·CSV export·성과분석 탭 (상단 "피드백 시스템" 절) |
 | 다음 | Celery + Redis 전환 (USE_CELERY 플래그 + docker-compose, 기본은 스레드풀) | ✅ 전환 준비 |
 | 다음 | 경쟁사 URL 분석 (쿠팡/11번가/네이버 어댑터, 색감/뱃지 패턴 → 컨셉 추천) | ⚠️ 구현 완료·**실수집 보류**: 3사 모두 정적 HTML 차단(상단 "경쟁사 분석" 절 참고). 공식 API 경로 안내. 모킹 로직 검증 유지 |
 | 다음 | 회원/요금제/크레딧/팀/API 키 | 🔜 |
